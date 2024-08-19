@@ -24,6 +24,33 @@
     {{ log('--------PREVIOUS REVOKES-----------', info=True) }}
     {{ log(log_previous_unique_revokes, info=True) }}
 
+    {% set revokes_to_execute = get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
+    {% set grants_to_execute = get_new_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
+
+    {% if (revokes_to_execute | length) > 0 or (grants_to_execute | length) > 0 %}
+        {% set execute_revokes_and_grants_query %}
+
+    ---Revokes
+    {{revokes_to_execute | join('\n')}}
+    ---Grants
+    {{grants_to_execute | join('\n')}}
+
+        {% endset %}
+
+        {{ log(execute_revokes_and_grants_query, info=True) }}
+
+        {% do run_query(execute_revokes_and_grants_query) %}
+
+    {% else %} {{ log("No grants or revokes to execute", info=True) }}
+    {% endif %}
+
+    {% set drop_temp_config_table_query %}
+    DROP TABLE access_management.{{temp_config_table_name}};
+    {% endset %}
+    {% do run_query(create_config_table_query) %}
+    {{ log(drop_temp_config_table_query, info=True) }}
+    {% do run_query(drop_temp_config_table_query) %}
+
 {% endmacro %}
 
 {% macro get_objects_in_database() %}
@@ -100,4 +127,26 @@
         'unique_revokes': unique_revokes
     } %}
     {{ return(result) }}
+{% endmacro %}
+
+{% macro get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
+    {% set revokes_to_execute = [] %}
+    {% for revoke in previous_unique_revokes %}
+        {% if revoke not in new_unique_revokes %}
+            {% do revokes_to_execute.append(revoke) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ return(revokes_to_execute) }}
+{% endmacro %}
+
+{% macro get_new_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
+    {% set grants_to_execute = [] %}
+    {% for grant in new_unique_grants %}
+        {% if grant not in previous_unique_grants %}
+            {% do grants_to_execute.append(grant) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ return(grants_to_execute) }}
 {% endmacro %}

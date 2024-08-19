@@ -108,8 +108,8 @@ CREATE TABLE access_management.{table_name} (
         revokes SUPER
     );
         """
-    create_table_sql += """
-    INSERT INTO access_management.config
+    create_table_sql += f"""
+    INSERT INTO access_management.{table_name}
     (project_name, database_name, schema_name, model_name, materialization, entity_type, entity_name, grants, revokes)
     VALUES
     """
