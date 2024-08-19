@@ -6,15 +6,15 @@ import click
 from dbt.cli.main import dbtRunner
 from dbt.contracts.graph.manifest import Manifest
 
-from dbt_access_management.access_management_config_file_parser import (
+from cli.access_management_config_file_parser import (
     parse_access_management_config,
     AccessManagementConfig,
 )
-from dbt_access_management.access_management_rows_generator import (
+from cli.access_management_rows_generator import (
     generate_access_management_rows,
     AccessManagementRow,
 )
-from dbt_access_management.model import ManifestNode, ModelType
+from cli.model import ManifestNode, ModelType
 
 try:
     from dbt.artifacts.resources.types import NodeType
@@ -184,7 +184,7 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
     "multi project setup (for example using meshify or dbt-loom)",
     type=str,
 )
-def cli(dbt_command: str, config_file_path: str, database_name: str = None):
+def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
     # TODO: Set max-line-length = 240 in .flake8
     command_list = list(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
@@ -201,4 +201,4 @@ def cli(dbt_command: str, config_file_path: str, database_name: str = None):
 
 
 if __name__ == "__main__":
-    cli()
+    dbt_am()

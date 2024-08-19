@@ -1,14 +1,14 @@
-from dbt_access_management.access_management_config_file_parser import (
+from cli.access_management_config_file_parser import (
     AccessConfigEntity,
     EntityType,
     AccessLevel,
     DataBaseAccessConfig,
 )
-from dbt_access_management.access_management_rows_generator import (
+from cli.access_management_rows_generator import (
     AccessManagementRow,
     generate_access_management_rows,
 )
-from dbt_access_management.model import ManifestNode, ModelType
+from cli.model import ManifestNode, ModelType
 
 # TODO: Refactor tests with parametrize and fixtures
 
