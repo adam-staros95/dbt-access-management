@@ -3,7 +3,7 @@
     {% do validate_configured_entities(config_table_name=temp_config_table_name, should_stop_execution=True) %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set log_objects_in_database = objects_in_database | join('\n') %}
-    {{ log('--------OBJECTS IN DB-----------', info=True) }}
+    {{ log('--------OBJECTS IN DATABASE-----------', info=True) }}
     {{ log(log_objects_in_database, info=True) }}
     {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_config_table_name) %}
     {% set new_unique_grants = new_unique_grants_and_revokes['unique_grants'] %}
@@ -23,6 +23,8 @@
     {{ log(log_previous_unique_grants, info=True) }}
     {{ log('--------PREVIOUS REVOKES-----------', info=True) }}
     {{ log(log_previous_unique_revokes, info=True) }}
+
+{% endmacro %}
 
 {% macro get_objects_in_database() %}
     {% set objects_in_database = [] %}
@@ -48,7 +50,7 @@
     {{ return(objects_in_database) }}
 {% endmacro %}
 
-{% macro get_grants_and_revokes(objects_in_database, config_table_name, should_check_if_config_table_exits=False) %}
+{% macro get_grants_and_revokes(objects_in_database, config_table_name, should_check_if_config_table_exits=True) %}
     {% set unique_grants = [] %}
     {% set unique_revokes = [] %}
 

@@ -160,7 +160,7 @@ def run_configure_access_management_operation(
     res = dbt.invoke(
         [
             "run-operation",
-            "configure_access_management",
+            "dbt_access_management.configure_access_management",
             "--args",
             json.dumps(
                 {
