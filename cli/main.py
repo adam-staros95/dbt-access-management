@@ -1,5 +1,6 @@
 import json
 import shlex
+import time
 from typing import List, Tuple
 
 import click
@@ -24,12 +25,12 @@ except ModuleNotFoundError:
 dbt = dbtRunner()
 
 
-def generate_create_config_table_query(
+def get_access_management_rows(
     manifest: Manifest,
     access_management_config: AccessManagementConfig,
+    project_name: str,
     database_name: str = None,
-) -> str:
-    project_name = manifest.metadata.project_name
+) -> List[AccessManagementRow]:
     sql_engine = manifest.metadata.adapter_type
     manifest_nodes = _get_nodes_eligible_for_access_management_from_manifest_file(
         manifest, project_name
@@ -45,10 +46,10 @@ def generate_create_config_table_query(
     click.echo(f"Access management will be configured on the: `{db_name}` database")
     for database_access_config in access_management_config.databases_access_config:
         if database_access_config.database_name == db_name:
-            rows = generate_access_management_rows(
+            return generate_access_management_rows(
                 database_access_config, manifest_nodes, project_name, sql_engine
             )
-            return _build_create_config_table_sql(rows)
+    return []
 
 
 def _get_nodes_eligible_for_access_management_from_manifest_file(
@@ -89,11 +90,13 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
     return result
 
 
-def _build_create_config_table_sql(rows: List[AccessManagementRow]) -> str:
-    create_table_sql = """
+def _build_create_config_table_sql(
+    rows: List[AccessManagementRow], table_name: str
+) -> str:
+    create_table_sql = f"""
 CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.config;
-CREATE TABLE access_management.config (
+DROP TABLE IF EXISTS access_management.{table_name};
+CREATE TABLE access_management.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
@@ -148,13 +151,25 @@ def load_manifest(manifest_path: str) -> Manifest:
     return Manifest.from_dict(manifest_data)
 
 
-def run_create_create_access_management_table_operation(query: str) -> None:
+def run_configure_access_management_operation(
+    temp_config_table_name: str,
+    config_table_name: str,
+    create_temp_config_table_query: str,
+    create_config_table_query: str,
+) -> None:
     res = dbt.invoke(
         [
             "run-operation",
-            "create_access_management_table",
+            "configure_access_management",
             "--args",
-            json.dumps({"create_access_management_table_query": query}),
+            json.dumps(
+                {
+                    "temp_config_table_name": temp_config_table_name,
+                    "config_table_name": config_table_name,
+                    "create_temp_config_table_query": create_temp_config_table_query,
+                    "create_config_table_query": create_config_table_query,
+                }
+            ),
         ]
     )
     if res.exception:
@@ -192,11 +207,25 @@ def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
     target, variables = _get_target_and_vars(command_list)
     _invoke_compile_command(target, variables)
     manifest = load_manifest("target/manifest.json")
+    project_name = manifest.metadata.project_name
     access_management_config = parse_access_management_config(config_file_path)
-    query = generate_create_config_table_query(
-        manifest, access_management_config, database_name
+    access_management_rows = get_access_management_rows(
+        manifest, access_management_config, project_name, database_name
     )
-    run_create_create_access_management_table_operation(query)
+    temp_config_table_name = f"temp_{project_name}_{int(time.time())}_config"
+    config_table_name = f"{project_name}_config"
+    temp_config_table_query = _build_create_config_table_sql(
+        access_management_rows, temp_config_table_name
+    )
+    config_table_query = _build_create_config_table_sql(
+        access_management_rows, config_table_name
+    )
+    run_configure_access_management_operation(
+        temp_config_table_name,
+        config_table_name,
+        temp_config_table_query,
+        config_table_query,
+    )
     _invoke_passed_dbt_command(command_list)
 
 

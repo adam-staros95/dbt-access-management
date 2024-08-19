@@ -39,7 +39,9 @@
                 {% set all_grants = [] %}
 
                 {% for grants_list in grant_queries %}
-                    {% for grant in grants_list %} {% do all_grants.append(grant) %} {% endfor %}
+                    {% for grant in grants_list %}
+                        {% do all_grants.append(grant) %}
+                    {% endfor %}
                 {% endfor %}
 
                 {% if all_grants %}
@@ -49,10 +51,12 @@
                     {% do dbt.run_query(all_grants_query) %}
                 {% else %} {{ log("No grants to execute.", info=True) }}
                 {% endif %}
-            {% else %} {{ log("No entities found; skipping grants execution.", info=True) }}
+            {% else %}
+                {{ log("No entities found; skipping grants execution.", info=True) }}
             {% endif %}
 
-        {% else %} {{ log("Skipping assigning permissions for ephemeral model", info=False) }}
+        {% else %}
+            {{ log("Skipping assigning permissions for ephemeral model", info=False) }}
         {% endif %}
     {% endif %}
 {% endmacro %}
