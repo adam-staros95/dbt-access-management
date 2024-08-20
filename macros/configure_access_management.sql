@@ -2,45 +2,25 @@
     {% do run_query(create_temp_config_table_query) %}
     {% do validate_configured_entities(config_table_name=temp_config_table_name, should_stop_execution=True) %}
     {% set objects_in_database = get_objects_in_database() %}
-    {% set log_objects_in_database = objects_in_database | join('\n') %}
-    {{ log('--------OBJECTS IN DATABASE-----------', info=True) }}
-    {{ log(log_objects_in_database, info=True) }}
     {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_config_table_name) %}
     {% set new_unique_grants = new_unique_grants_and_revokes['unique_grants'] %}
     {% set new_unique_revokes = new_unique_grants_and_revokes['unique_revokes'] %}
-    {% set log_new_unique_grants = new_unique_grants | join('\n') %}
-    {% set log_new_unique_revokes = new_unique_revokes | join('\n') %}
-    {{ log('--------NEW GRANTS-----------', info=True) }}
-    {{ log(log_new_unique_grants, info=True) }}
-    {{ log('--------NEW REVOKES-----------', info=True) }}
-    {{ log(log_new_unique_revokes, info=True) }}
     {% set previous_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, config_table_name, True) %}
     {% set previous_unique_grants = previous_unique_grants_and_revokes['unique_grants'] %}
     {% set previous_unique_revokes = previous_unique_grants_and_revokes['unique_revokes'] %}
-    {% set log_previous_unique_grants = previous_unique_grants | join('\n') %}
-    {% set log_previous_unique_revokes = previous_unique_revokes | join('\n') %}
-    {{ log('--------PREVIOUS GRANTS-----------', info=True) }}
-    {{ log(log_previous_unique_grants, info=True) }}
-    {{ log('--------PREVIOUS REVOKES-----------', info=True) }}
-    {{ log(log_previous_unique_revokes, info=True) }}
 
     {% set revokes_to_execute = get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
     {% set grants_to_execute = get_new_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
 
     {% if (revokes_to_execute | length) > 0 or (grants_to_execute | length) > 0 %}
         {% set execute_revokes_and_grants_query %}
-
     ---Revokes
     {{revokes_to_execute | join('\n')}}
     ---Grants
     {{grants_to_execute | join('\n')}}
-
         {% endset %}
-
-        {{ log(execute_revokes_and_grants_query, info=True) }}
-
+        {{ log("Running revokes and grants:\n" ~ execute_revokes_and_grants_query, info=True) }}
         {% do run_query(execute_revokes_and_grants_query) %}
-
     {% else %} {{ log("No grants or revokes to execute", info=True) }}
     {% endif %}
 
