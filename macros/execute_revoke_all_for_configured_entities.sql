@@ -1,1 +1,2 @@
---TODO: Generate revoke all command for all entities
+-- TODO: Generate revoke all command for all entities
+
