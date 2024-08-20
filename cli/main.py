@@ -1,20 +1,21 @@
 import json
 import shlex
+import time
 from typing import List, Tuple
 
 import click
 from dbt.cli.main import dbtRunner
 from dbt.contracts.graph.manifest import Manifest
 
-from dbt_access_management.access_management_config_file_parser import (
+from cli.access_management_config_file_parser import (
     parse_access_management_config,
     AccessManagementConfig,
 )
-from dbt_access_management.access_management_rows_generator import (
+from cli.access_management_rows_generator import (
     generate_access_management_rows,
     AccessManagementRow,
 )
-from dbt_access_management.model import ManifestNode, ModelType
+from cli.model import ManifestNode, ModelType
 
 try:
     from dbt.artifacts.resources.types import NodeType
@@ -24,12 +25,12 @@ except ModuleNotFoundError:
 dbt = dbtRunner()
 
 
-def generate_create_config_table_query(
-    manifest: Manifest,
-    access_management_config: AccessManagementConfig,
-    database_name: str = None,
-) -> str:
-    project_name = manifest.metadata.project_name
+def get_access_management_rows(
+        manifest: Manifest,
+        access_management_config: AccessManagementConfig,
+        project_name: str,
+        database_name: str = None,
+) -> List[AccessManagementRow]:
     sql_engine = manifest.metadata.adapter_type
     manifest_nodes = _get_nodes_eligible_for_access_management_from_manifest_file(
         manifest, project_name
@@ -45,21 +46,21 @@ def generate_create_config_table_query(
     click.echo(f"Access management will be configured on the: `{db_name}` database")
     for database_access_config in access_management_config.databases_access_config:
         if database_access_config.database_name == db_name:
-            rows = generate_access_management_rows(
+            return generate_access_management_rows(
                 database_access_config, manifest_nodes, project_name, sql_engine
             )
-            return _build_create_config_table_sql(rows)
+    return []
 
 
 def _get_nodes_eligible_for_access_management_from_manifest_file(
-    manifest: Manifest, project_name: str
+        manifest: Manifest, project_name: str
 ) -> List[ManifestNode]:
     result = []
     for unique_id, node in manifest.nodes.items():
         if (
-            unique_id.split(".")[0] == NodeType.Model.value
-            and node.config.materialized != "ephemeral"
-            and node.package_name == project_name
+                unique_id.split(".")[0] == NodeType.Model.value
+                and node.config.materialized != "ephemeral"
+                and node.package_name == project_name
         ):
             result.append(
                 ManifestNode(
@@ -73,8 +74,8 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
             )
 
         if (
-            unique_id.split(".")[0] == NodeType.Seed.value
-            and node.package_name == project_name
+                unique_id.split(".")[0] == NodeType.Seed.value
+                and node.package_name == project_name
         ):
             result.append(
                 ManifestNode(
@@ -89,11 +90,13 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
     return result
 
 
-def _build_create_config_table_sql(rows: List[AccessManagementRow]) -> str:
-    create_table_sql = """
+def _build_create_config_table_sql(
+        rows: List[AccessManagementRow], table_name: str
+) -> str:
+    create_table_sql = f"""
 CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.config;
-CREATE TABLE access_management.config (
+DROP TABLE IF EXISTS access_management.{table_name};
+CREATE TABLE access_management.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
@@ -105,8 +108,8 @@ CREATE TABLE access_management.config (
         revokes SUPER
     );
         """
-    create_table_sql += """
-    INSERT INTO access_management.config
+    create_table_sql += f"""
+    INSERT INTO access_management.{table_name}
     (project_name, database_name, schema_name, model_name, materialization, entity_type, entity_name, grants, revokes)
     VALUES
     """
@@ -148,13 +151,25 @@ def load_manifest(manifest_path: str) -> Manifest:
     return Manifest.from_dict(manifest_data)
 
 
-def run_create_create_access_management_table_operation(query: str) -> None:
+def run_configure_access_management_operation(
+        temp_config_table_name: str,
+        config_table_name: str,
+        create_temp_config_table_query: str,
+        create_config_table_query: str,
+) -> None:
     res = dbt.invoke(
         [
             "run-operation",
-            "create_access_management_table",
+            "dbt_access_management.configure_access_management",
             "--args",
-            json.dumps({"create_access_management_table_query": query}),
+            json.dumps(
+                {
+                    "temp_config_table_name": temp_config_table_name,
+                    "config_table_name": config_table_name,
+                    "create_temp_config_table_query": create_temp_config_table_query,
+                    "create_config_table_query": create_config_table_query,
+                }
+            ),
         ]
     )
     if res.exception:
@@ -180,25 +195,41 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
 @click.option(
     "--database-name",
     help="Database name for which you want to configure access management. "
-    "It it highly recommended to specify database name in "
-    "multi project setup (for example using meshify or dbt-loom)",
+         "It it highly recommended to specify database name in "
+         "multi project setup (for example using meshify or dbt-loom)",
     type=str,
 )
-def cli(dbt_command: str, config_file_path: str, database_name: str = None):
+def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
     # TODO: Set max-line-length = 240 in .flake8
+    # TODO: Add full-refresh flow with running macros
+    #  execute_revoke_all_for_configured_entities and execute_grants_for_configured_entities
     command_list = list(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
     )
     target, variables = _get_target_and_vars(command_list)
     _invoke_compile_command(target, variables)
     manifest = load_manifest("target/manifest.json")
+    project_name = manifest.metadata.project_name
     access_management_config = parse_access_management_config(config_file_path)
-    query = generate_create_config_table_query(
-        manifest, access_management_config, database_name
+    access_management_rows = get_access_management_rows(
+        manifest, access_management_config, project_name, database_name
     )
-    run_create_create_access_management_table_operation(query)
+    temp_config_table_name = f"temp_{project_name}_{int(time.time())}_config"
+    config_table_name = f"{project_name}_config"
+    temp_config_table_query = _build_create_config_table_sql(
+        access_management_rows, temp_config_table_name
+    )
+    config_table_query = _build_create_config_table_sql(
+        access_management_rows, config_table_name
+    )
+    run_configure_access_management_operation(
+        temp_config_table_name,
+        config_table_name,
+        temp_config_table_query,
+        config_table_query,
+    )
     _invoke_passed_dbt_command(command_list)
 
 
 if __name__ == "__main__":
-    cli()
+    dbt_am()

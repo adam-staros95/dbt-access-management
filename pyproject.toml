@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Tool for managing database access in DBT projects"
 authors = ["astaros <staros.adam@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "dbt_access_management" }]
+packages = [{ include = "cli" }]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
@@ -23,4 +23,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-dbt-am = "dbt_access_management.cli:cli"
+dbt-am = "cli.main:dbt_am"

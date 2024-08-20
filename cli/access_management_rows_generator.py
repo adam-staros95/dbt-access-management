@@ -2,14 +2,14 @@ from typing import List, Set
 
 from pydantic import BaseModel
 
-from dbt_access_management.access_management_config_file_parser import (
+from cli.access_management_config_file_parser import (
     EntityType,
     DataBaseAccessConfig,
     AccessLevel,
     AccessConfigEntity,
 )
-from dbt_access_management.constants import SUPPORTED_SQL_ENGINES
-from dbt_access_management.model import ManifestNode, ModelType
+from cli.constants import SUPPORTED_SQL_ENGINES
+from cli.model import ManifestNode, ModelType
 
 
 class AccessManagementRow(BaseModel):
