@@ -1,4 +1,4 @@
-{% macro execute_grants() %}
+{% macro execute_grants_for_model() %}
     {% if execute %}
         {% if config.get('materialized') != 'ephemeral' %}
 
@@ -22,7 +22,7 @@
                 {% set in_clause = entity_conditions | join(", ") %}
                 {% set query_config_table %}
             SELECT json_parse(grants::varchar) AS grants
-            FROM access_management.config
+            FROM access_management.{{project_name}}_config
             WHERE schema_name = '{{ this.schema }}'
             AND model_name = '{{ this.name }}'
             AND (entity_type, entity_name) IN ({{ in_clause }});
