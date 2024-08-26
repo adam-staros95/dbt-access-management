@@ -3,10 +3,10 @@ from typing import List, Set
 from pydantic import BaseModel
 
 from cli.access_management_config_file_parser import (
-    EntityType,
+    IdentityType,
     DataBaseAccessConfig,
     AccessLevel,
-    AccessConfigEntity,
+    AccessConfigIdentity,
 )
 from cli.constants import SUPPORTED_SQL_ENGINES
 from cli.model import ManifestNode, ModelType
@@ -18,8 +18,8 @@ class AccessManagementRow(BaseModel):
     schema_name: str
     model_name: str
     materialization: str
-    entity_type: EntityType
-    entity_name: str
+    identity_type: IdentityType
+    identity_name: str
     grants: Set[str] = {}
     revokes: Set[str] = {}
 
@@ -37,32 +37,32 @@ def generate_access_management_rows(
     access_management_rows = []
 
     for node in manifest_nodes:
-        for entity in data_base_access_config.access_config_entities:
+        for identity in data_base_access_config.access_config_identities:
             grants_per_node = set()
             revokes_per_node = set()
 
             sorted_config_paths = sorted(
-                entity.config_paths, key=lambda x: x[0].count("/"), reverse=True
+                identity.config_paths, key=lambda x: x[0].count("/"), reverse=True
             )
 
             for path, access_level in sorted_config_paths:
                 if node.model_type == ModelType.MODEL:
                     if f"/{node.path.replace('.sql', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
-                            access_level, entity, node
+                            access_level, identity, node
                         )
                         revokes_per_node = _get_revoke_statements(
-                            access_level, entity, node
+                            access_level, identity, node
                         )
                         break
 
                 if node.model_type == ModelType.SEED:
                     if f"/{node.path.replace('.csv', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
-                            access_level, entity, node
+                            access_level, identity, node
                         )
                         revokes_per_node = _get_revoke_statements(
-                            access_level, entity, node
+                            access_level, identity, node
                         )
                         break
 
@@ -72,8 +72,8 @@ def generate_access_management_rows(
                 schema_name=node.schema_name,
                 model_name=node.model_name,
                 materialization=node.materialization,
-                entity_type=entity.entity_type,
-                entity_name=entity.entity_name,
+                identity_type=identity.identity_type,
+                identity_name=identity.identity_name,
                 grants=grants_per_node,
                 revokes=revokes_per_node,
             )
@@ -82,45 +82,49 @@ def generate_access_management_rows(
     return access_management_rows
 
 
-def _get_entity_name_with_keyword_for_entity_type(entity: AccessConfigEntity) -> str:
-    return f"""{f'ROLE {entity.entity_name}' if entity.entity_type == EntityType.ROLE
-    else f'GROUP {entity.entity_name}' if entity.entity_type == EntityType.GROUP
-    else f'{entity.entity_name}'}"""
+def _get_identity_name_with_keyword_for_identity_type(
+    identity: AccessConfigIdentity,
+) -> str:
+    return f"""{f'ROLE {identity.identity_name}' if identity.identity_type == IdentityType.ROLE
+    else f'GROUP {identity.identity_name}' if identity.identity_type == IdentityType.GROUP
+    else f'{identity.identity_name}'}"""
 
 
 def _get_grant_statements(
-    access_level: AccessLevel, entity: AccessConfigEntity, node: ManifestNode
+    access_level: AccessLevel, entity: AccessConfigIdentity, node: ManifestNode
 ) -> Set[str]:
     grants = set()
-    entity_name_with_keyword = _get_entity_name_with_keyword_for_entity_type(entity)
+    identity_name_with_keyword = _get_identity_name_with_keyword_for_identity_type(
+        entity
+    )
 
     grants.add(
-        f"GRANT USAGE ON SCHEMA {node.schema_name} TO {entity_name_with_keyword};"
+        f'GRANT USAGE ON SCHEMA {node.schema_name} TO "{identity_name_with_keyword}";'
     )
     if access_level == AccessLevel.READ:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT SELECT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.WRITE:
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT INSERT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT UPDATE ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.READ_WRITE:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT SELECT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT INSERT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT UPDATE ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.ALL:
         grants.add(
-            f"GRANT ALL ON {node.schema_name}.{node.model_name} TO {entity_name_with_keyword};"
+            f'GRANT ALL ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
 
     return grants
@@ -128,36 +132,38 @@ def _get_grant_statements(
 
 def _get_revoke_statements(
     access_level: AccessLevel,
-    entity: AccessConfigEntity,
+    entity: AccessConfigIdentity,
     node: ManifestNode,
 ) -> Set[str]:
     revokes = set()
-    entity_name_with_keyword = _get_entity_name_with_keyword_for_entity_type(entity)
+    identity_name_with_keyword = _get_identity_name_with_keyword_for_identity_type(
+        entity
+    )
 
     if access_level == AccessLevel.READ:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.WRITE:
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.READ_WRITE:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.ALL:
         revokes.add(
-            f"REVOKE ALL ON {node.schema_name}.{node.model_name} FROM {entity_name_with_keyword};"
+            f'REVOKE ALL ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
 
     return revokes

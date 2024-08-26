@@ -6,7 +6,7 @@ import yaml
 from pydantic import BaseModel
 
 
-class EntityType(str, Enum):
+class IdentityType(str, Enum):
     USER = "user"
     GROUP = "group"
     ROLE = "role"
@@ -19,15 +19,15 @@ class AccessLevel(str, Enum):
     ALL = "all"
 
 
-class AccessConfigEntity(BaseModel):
-    entity_type: EntityType
-    entity_name: str
+class AccessConfigIdentity(BaseModel):
+    identity_type: IdentityType
+    identity_name: str
     config_paths: List[Tuple[str, AccessLevel]]
 
 
 class DataBaseAccessConfig(BaseModel):
     database_name: str
-    access_config_entities: List[AccessConfigEntity]
+    access_config_identities: List[AccessConfigIdentity]
 
 
 class AccessManagementConfig(BaseModel):
@@ -66,36 +66,36 @@ def parse_access_management_config(config_file_path: str) -> AccessManagementCon
         groups_config = entities.get("groups", {})
 
         users_entities = [
-            AccessConfigEntity(
-                entity_name=entity_name,
+            AccessConfigIdentity(
+                identity_name=identity_name,
                 config_paths=_extract_config_paths(config, "/"),
-                entity_type=EntityType.USER,
+                identity_type=IdentityType.USER,
             )
-            for entity_name, config in users_config.items()
+            for identity_name, config in users_config.items()
         ]
 
         roles_entities = [
-            AccessConfigEntity(
-                entity_name=entity_name,
+            AccessConfigIdentity(
+                identity_name=identity_name,
                 config_paths=_extract_config_paths(config, "/"),
-                entity_type=EntityType.ROLE,
+                identity_type=IdentityType.ROLE,
             )
-            for entity_name, config in roles_config.items()
+            for identity_name, config in roles_config.items()
         ]
 
         groups_entities = [
-            AccessConfigEntity(
-                entity_name=entity_name,
+            AccessConfigIdentity(
+                identity_name=identity_name,
                 config_paths=_extract_config_paths(config, "/"),
-                entity_type=EntityType.GROUP,
+                identity_type=IdentityType.GROUP,
             )
-            for entity_name, config in groups_config.items()
+            for identity_name, config in groups_config.items()
         ]
 
         databases_access_config.append(
             DataBaseAccessConfig(
                 database_name=database_name,
-                access_config_entities=users_entities
+                access_config_identities=users_entities
                 + roles_entities
                 + groups_entities,
             )
