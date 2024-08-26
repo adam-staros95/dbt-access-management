@@ -2,7 +2,7 @@ from typing import List, Set
 
 from pydantic import BaseModel
 
-from cli.access_mangement.access_management_config_file_parser import (
+from cli.access_management_config_file_parser import (
     IdentityType,
     DataBaseAccessConfig,
     AccessLevel,
@@ -85,12 +85,9 @@ def generate_access_management_rows(
 def _get_identity_name_with_keyword_for_identity_type(
     identity: AccessConfigIdentity,
 ) -> str:
-    if identity.identity_type == IdentityType.ROLE:
-        return f'ROLE \\"{identity.identity_name}\\"'
-    elif identity.identity_type == IdentityType.GROUP:
-        return f'GROUP \\"{identity.identity_name}\\"'
-    else:
-        return f'\\"{identity.identity_name}\\"'
+    return f"""{f'ROLE {identity.identity_name}' if identity.identity_type == IdentityType.ROLE
+    else f'GROUP {identity.identity_name}' if identity.identity_type == IdentityType.GROUP
+    else f'{identity.identity_name}'}"""
 
 
 def _get_grant_statements(
@@ -102,32 +99,32 @@ def _get_grant_statements(
     )
 
     grants.add(
-        f"GRANT USAGE ON SCHEMA {node.schema_name} TO {identity_name_with_keyword};"
+        f'GRANT USAGE ON SCHEMA {node.schema_name} TO "{identity_name_with_keyword}";'
     )
     if access_level == AccessLevel.READ:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT SELECT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.WRITE:
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT INSERT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT UPDATE ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.READ_WRITE:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT SELECT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT INSERT ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT UPDATE ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.ALL:
         grants.add(
-            f"GRANT ALL ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f'GRANT ALL ON {node.schema_name}.{node.model_name} TO "{identity_name_with_keyword}";'
         )
 
     return grants
@@ -145,28 +142,28 @@ def _get_revoke_statements(
 
     if access_level == AccessLevel.READ:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.WRITE:
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.READ_WRITE:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
     if access_level == AccessLevel.ALL:
         revokes.add(
-            f"REVOKE ALL ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f'REVOKE ALL ON {node.schema_name}.{node.model_name} FROM "{identity_name_with_keyword}";'
         )
 
     return revokes

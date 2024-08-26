@@ -17,24 +17,5 @@
     {% endfor %}
 
     {{ return(identities) }}
-{% endmacro %}
 
-{% macro get_users(database_identities) %}
-    {% set users = [] %}
-    {% for identity in database_identities %}
-        {% if identity['identity_type'] == 'user' %}
-            {% do users.append(identity['identity_name']) %}
-        {% endif %}
-    {% endfor %}
-    {{ return(users) }}
-{% endmacro %}
-
-{% macro get_roles(database_identities) %}
-    {% set roles = [] %}
-    {% for identity in database_identities %}
-        {% if identity['identity_type'] == 'role' %}
-            {% do roles.append(identity['identity_name']) %}
-        {% endif %}
-    {% endfor %}
-    {{ return(roles) }}
 {% endmacro %}
