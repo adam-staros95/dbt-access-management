@@ -12,7 +12,6 @@ from cli.constants import SUPPORTED_SQL_ENGINES
 from cli.model import ManifestNode, ModelType
 
 
-# TODO: Rename `entity_type` to `identity_type` and `entity_name` to `identity_name`
 class AccessManagementRow(BaseModel):
     project_name: str
     database_name: str

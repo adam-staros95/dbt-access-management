@@ -1,56 +1,55 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
         {% if config.get('materialized') != 'ephemeral' %}
+            {% if not is_incremental() %}
 
-        {% set project_unique_id = dbt_access_management.generate_project_name_unique_id(project_name) %}
+                {% set project_unique_id = dbt_access_management.generate_project_name_unique_id(project_name) %}
 
-        {% set database_identities = dbt_access_management.get_database_identities() %}
-        {% set users_identities = dbt_access_management.get_users(database_identities) %}
-        {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
+                {% set database_identities = dbt_access_management.get_database_identities() %}
+                {% set users_identities = dbt_access_management.get_users(database_identities) %}
+                {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
+                {% set masking_configs =  dbt_access_management.get_masking_configs_for_model() %}
 
-        {% set masking_configs =  dbt_access_management.get_masking_configs_for_model() %}
+                {% set columns = adapter.get_columns_in_relation(this) %}
 
-        {% set columns = adapter.get_columns_in_relation(this) %}
-
-        {% set log_msg -%}
-        {%- for masking_config in masking_configs -%}
-            {{ log(masking_config, info=True) }}
-            {%- for col in columns -%}
-                {%- if col.quoted == masking_config['column_name'] -%}
-                    {{ log(col, info=True) }}
-                    {%- if col.is_string() -%}
-                        {%- set masking_policy_name = project_name ~ '_mask_varchar_column_' ~ project_unique_id -%}
-                        {%- set unmasking_policy_name = project_name ~ '_unmask_varchar_column_' ~ project_unique_id -%}
-                        ATTACH MASKING POLICY {{ masking_policy_name }}
-                        ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                        TO PUBLIC;
-                        {{ '\n' -}}
-                        {%- for user in fromjson(masking_config['users_with_access']) -%}
-                        --TODO: FIX THIS FILTER
-                        {%- if user in users_identities -%}
-                        ATTACH MASKING POLICY {{ unmasking_policy_name }}
-                        ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                        TO "{{ user }}" PRIORITY 10;
-                        {{ '\n' -}}
+                {% set configure_masking_query -%}
+            {%- for masking_config in masking_configs -%}
+                {%- for col in columns -%}
+                    {%- if col.quoted == masking_config['column_name'] -%}
+                        {%- if col.is_string() -%}
+                            {%- set masking_policy_name = project_name ~ '_mask_varchar_column_' ~ project_unique_id -%}
+                            {%- set unmasking_policy_name = project_name ~ '_unmask_varchar_column_' ~ project_unique_id -%}
+                            ATTACH MASKING POLICY {{ masking_policy_name }}
+                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                            TO PUBLIC;
+                            {{ '\n' -}}
+                            {%- for user in fromjson(masking_config['users_with_access']) -%}
+                            {%- if user in users_identities -%}
+                            ATTACH MASKING POLICY {{ unmasking_policy_name }}
+                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                            TO "{{ user }}" PRIORITY 10;
+                            {{ '\n' -}}
+                            {%- endif -%}
+                            {%- endfor -%}
+                            {%- for role in fromjson(masking_config['roles_with_access']) -%}
+                            {%- if role in roles_identities -%}
+                            ATTACH MASKING POLICY {{ unmasking_policy_name }}
+                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                            TO ROLE "{{ role }}" PRIORITY 10;
+                            {{ '\n' -}}
+                            {%- endif -%}
+                            {%- endfor -%}
                         {%- endif -%}
-                        {%- endfor -%}
-                        {%- for role in fromjson(masking_config['roles_with_access']) -%}
-                        --TODO: FIX THIS FILTER
-                        {%- if role in roles_identities -%}
-                        ATTACH MASKING POLICY {{ unmasking_policy_name }}
-                        ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                        TO ROLE "{{ role }}" PRIORITY 10;
-                        {{ '\n' -}}
-                        {%- endif -%}
-                        {%- endfor -%}
                     {%- endif -%}
-                {%- endif -%}
+                {%- endfor -%}
             {%- endfor -%}
-        {%- endfor -%}
-        {%- endset %}
+                {%- endset %}
+                {{ log(configure_masking_query, info=True) }}
+                {% do dbt.run_query(configure_masking_query) %}
 
-        {{ log(log_msg, info=True) }}
-
+            {% else %}
+                {{ log("Applying masking policies for incremental runs is not currently supported!", info=True) }}
+            {% endif %}
         {% else %}
             {{ log("Skipping assigning masking policies for ephemeral model", info=False) }}
         {% endif %}
@@ -61,7 +60,7 @@
     {% set users = [] %}
     {% for identity in database_identities %}
         {% if identity['identity_type'] == 'user' %}
-            {% do users.append(['identity_name']) %}
+            {% do users.append(identity['identity_name']) %}
         {% endif %}
     {% endfor %}
     {{ return(users) }}
@@ -71,8 +70,8 @@
     {% set roles = [] %}
     {% for identity in database_identities %}
         {% if identity['identity_type'] == 'role' %}
-             {% do roles.append(['identity_name']) %}
-         {% endif %}
+            {% do roles.append(identity['identity_name']) %}
+        {% endif %}
     {% endfor %}
     {{ return(roles) }}
 {% endmacro %}
