@@ -1,4 +1,4 @@
-{% macro execute_grants_for_configured_entities() %}
+{% macro execute_grants_for_configured_identities() %}
     {% set objects_in_database = get_objects_in_database() %}
 
     {% set database_identities = get_database_identities() %}

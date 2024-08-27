@@ -1,5 +1,3 @@
---TODO: REFACTOR TO USE get_database_identities
-
 {% macro execute_grants_for_model() %}
     {% if execute %}
         {% if config.get('materialized') != 'ephemeral' %}

@@ -218,7 +218,7 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
 )
 def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
     # TODO: Add full-refresh flow with running macros
-    #  execute_revoke_all_for_configured_entities and execute_grants_for_configured_entities
+    #  execute_revoke_all_for_configured_identities and execute_grants_for_configured_identities
     command_list = list(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
     )
