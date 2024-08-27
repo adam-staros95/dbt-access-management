@@ -26,10 +26,10 @@ dbt = dbtRunner()
 
 
 def get_access_management_rows(
-        manifest: Manifest,
-        access_management_config: AccessManagementConfig,
-        project_name: str,
-        database_name: str = None,
+    manifest: Manifest,
+    access_management_config: AccessManagementConfig,
+    project_name: str,
+    database_name: str = None,
 ) -> List[AccessManagementRow]:
     sql_engine = manifest.metadata.adapter_type
     manifest_nodes = _get_nodes_eligible_for_access_management_from_manifest_file(
@@ -53,14 +53,14 @@ def get_access_management_rows(
 
 
 def _get_nodes_eligible_for_access_management_from_manifest_file(
-        manifest: Manifest, project_name: str
+    manifest: Manifest, project_name: str
 ) -> List[ManifestNode]:
     result = []
     for unique_id, node in manifest.nodes.items():
         if (
-                unique_id.split(".")[0] == NodeType.Model.value
-                and node.config.materialized != "ephemeral"
-                and node.package_name == project_name
+            unique_id.split(".")[0] == NodeType.Model.value
+            and node.config.materialized != "ephemeral"
+            and node.package_name == project_name
         ):
             result.append(
                 ManifestNode(
@@ -74,8 +74,8 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
             )
 
         if (
-                unique_id.split(".")[0] == NodeType.Seed.value
-                and node.package_name == project_name
+            unique_id.split(".")[0] == NodeType.Seed.value
+            and node.package_name == project_name
         ):
             result.append(
                 ManifestNode(
@@ -91,7 +91,7 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
 
 
 def _build_create_config_table_sql(
-        rows: List[AccessManagementRow], table_name: str
+    rows: List[AccessManagementRow], table_name: str
 ) -> str:
     create_table_sql = f"""
 CREATE SCHEMA IF NOT EXISTS access_management;
@@ -102,23 +102,37 @@ CREATE TABLE access_management.{table_name} (
         schema_name TEXT,
         model_name TEXT,
         materialization TEXT,
-        entity_type TEXT,
-        entity_name TEXT,
+        identity_type TEXT,
+        identity_name TEXT,
         grants SUPER,
         revokes SUPER
     );
-        """
-    create_table_sql += f"""
-    INSERT INTO access_management.{table_name}
-    (project_name, database_name, schema_name, model_name, materialization, entity_type, entity_name, grants, revokes)
-    VALUES
     """
-    values = []
-    for row in rows:
-        values.append(
-            f"('{row.project_name}', '{row.database_name}', '{row.schema_name}', '{row.model_name}', '{row.materialization}', '{row.entity_type}', '{row.entity_name}', '{json.dumps(list(row.grants))}', '{json.dumps(list(row.revokes))}')"
-        )
-    create_table_sql += ",\n".join(values) + ";"
+    if rows:
+        create_table_sql += f"""
+        INSERT INTO access_management.{table_name}
+        (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes)
+        VALUES
+        """
+
+        values = []
+        for row in rows:
+            grants = json.dumps(list(row.grants)).replace("'", "''")
+            revokes = json.dumps(list(row.revokes)).replace("'", "''")
+            value = (
+                f"('{row.project_name}', "
+                f"'{row.database_name}', "
+                f"'{row.schema_name}', "
+                f"'{row.model_name}', "
+                f"'{row.materialization}', "
+                f"'{row.identity_type}', "
+                f"'{row.identity_name}', "
+                f"'{grants}', "
+                f"'{revokes}')"
+            )
+            values.append(value)
+
+        create_table_sql += ",\n".join(values) + ";"
     return create_table_sql
 
 
@@ -134,13 +148,14 @@ def _get_target_and_vars(command_list: List[str]) -> Tuple[str, str]:
 
 
 def _invoke_compile_command(target: str, variables: str) -> None:
+    click.echo("Compiling project...")
     cmd = ["compile"]
     if target:
         cmd.extend(["--target", target])
     if variables:
         cmd.extend(["--vars", variables])
     res = dbt.invoke(cmd)
-    if res.exception:
+    if not res.success:
         exit(1)
 
 
@@ -152,11 +167,12 @@ def load_manifest(manifest_path: str) -> Manifest:
 
 
 def run_configure_access_management_operation(
-        temp_config_table_name: str,
-        config_table_name: str,
-        create_temp_config_table_query: str,
-        create_config_table_query: str,
+    temp_config_table_name: str,
+    config_table_name: str,
+    create_temp_config_table_query: str,
+    create_config_table_query: str,
 ) -> None:
+    click.echo("Configuring access management...")
     res = dbt.invoke(
         [
             "run-operation",
@@ -172,13 +188,14 @@ def run_configure_access_management_operation(
             ),
         ]
     )
-    if res.exception:
+    if not res.success:
         exit(1)
 
 
 def _invoke_passed_dbt_command(command_list: List[str]) -> None:
+    click.echo("Running passed dbt command...")
     res = dbt.invoke(command_list)
-    if res.exception:
+    if not res.success:
         exit(1)
 
 
@@ -195,22 +212,21 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
 @click.option(
     "--database-name",
     help="Database name for which you want to configure access management. "
-         "It it highly recommended to specify database name in "
-         "multi project setup (for example using meshify or dbt-loom)",
+    "It it highly recommended to specify database name in "
+    "multi project setup (for example using meshify or dbt-loom)",
     type=str,
 )
 def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
-    # TODO: Set max-line-length = 240 in .flake8
     # TODO: Add full-refresh flow with running macros
     #  execute_revoke_all_for_configured_entities and execute_grants_for_configured_entities
     command_list = list(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
     )
     target, variables = _get_target_and_vars(command_list)
+    access_management_config = parse_access_management_config(config_file_path)
     _invoke_compile_command(target, variables)
     manifest = load_manifest("target/manifest.json")
     project_name = manifest.metadata.project_name
-    access_management_config = parse_access_management_config(config_file_path)
     access_management_rows = get_access_management_rows(
         manifest, access_management_config, project_name, database_name
     )

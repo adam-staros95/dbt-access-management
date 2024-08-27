@@ -1,11 +1,16 @@
 {% macro configure_access_management(temp_config_table_name, config_table_name, create_temp_config_table_query, create_config_table_query) %}
+    {% set create_temp_config_table_query %}
+    {{ create_temp_config_table_query }}
+    {% endset %}
+    {{ log("Creating temporary access config table " ~ temp_config_table_name, info=True) }}
     {% do run_query(create_temp_config_table_query) %}
-    {% do validate_configured_entities(config_table_name=temp_config_table_name, should_stop_execution=True) %}
+    {% do validate_configured_identities(config_table_name=temp_config_table_name, should_stop_execution=True) %}
     {% set objects_in_database = get_objects_in_database() %}
-    {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_config_table_name) %}
+    {% set database_identities = get_database_identities() %}
+    {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_config_table_name, database_identities) %}
     {% set new_unique_grants = new_unique_grants_and_revokes['unique_grants'] %}
     {% set new_unique_revokes = new_unique_grants_and_revokes['unique_revokes'] %}
-    {% set previous_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, config_table_name, True) %}
+    {% set previous_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, config_table_name, database_identities, True) %}
     {% set previous_unique_grants = previous_unique_grants_and_revokes['unique_grants'] %}
     {% set previous_unique_revokes = previous_unique_grants_and_revokes['unique_revokes'] %}
 
@@ -33,7 +38,7 @@
 
 {% endmacro %}
 
-{% macro get_grants_and_revokes(objects_in_database, config_table_name, should_check_if_config_table_exits=True) %}
+{% macro get_grants_and_revokes(objects_in_database, config_table_name, database_identities, should_check_if_config_table_exits=True) %}
     {% set unique_grants = [] %}
     {% set unique_revokes = [] %}
 
@@ -51,38 +56,54 @@
         {% endif %}
     {% endif %}
 
-    {% set query %}
+    {% set identity_conditions = [] %}
+    {% for identity in database_identities %}
+        {% do identity_conditions.append("('" ~ identity['identity_type'] ~ "', '" ~ identity['identity_name'] ~ "')") %}
+    {% endfor %}
+
+    {% if database_identities | length > 0 %}
+        {% set identities_in_clause = identity_conditions | join(", ") %}
+        {% set query_config_table %}
         SELECT json_parse(grants::varchar) as grants, json_parse(revokes::varchar) as revokes
         FROM access_management.{{config_table_name}}
         WHERE database_name || '.' || schema_name || '.' || model_name || '.' ||  CASE
             WHEN lower(materialization) = 'view' THEN 'view'  ELSE 'table' END
         IN ({{ "'" ~ objects_in_database | join("', '") ~ "'" }})
-    {% endset %}
+        AND (identity_type, identity_name) IN ({{ identities_in_clause }});
+        {% endset %}
 
-    {% set grants_and_revokes = run_query(query) %}
-    {% if grants_and_revokes %}
-        {% for row in grants_and_revokes.rows %}
-            {% set grants_list = fromjson(row.grants) %}
-            {% set revokes_list = fromjson(row.revokes) %}
-            {% for grant_query in grants_list %}
-                {% if grant_query not in unique_grants %}
-                    {% do unique_grants.append(grant_query) %}
-                {% endif %}
+        {% set grants_and_revokes = run_query(query_config_table) %}
+        {% if grants_and_revokes %}
+            {% for row in grants_and_revokes.rows %}
+                {% set grants_list = fromjson(row.grants) %}
+                {% set revokes_list = fromjson(row.revokes) %}
+                {% for grant_query in grants_list %}
+                    {% if grant_query not in unique_grants %}
+                        {% do unique_grants.append(grant_query) %}
+                    {% endif %}
+                {% endfor %}
+                {% for revoke_query in revokes_list %}
+                    {% if revoke_query not in unique_revokes %}
+                        {% do unique_revokes.append(revoke_query) %}
+                    {% endif %}
+                {% endfor %}
             {% endfor %}
-            {% for revoke_query in revokes_list %}
-                {% if revoke_query not in unique_revokes %}
-                    {% do unique_revokes.append(revoke_query) %}
-                {% endif %}
-            {% endfor %}
-        {% endfor %}
-    {% else %}
-        {{ log("No grants and revokes found in table: " ~ config_table_name, info=True) }}
-    {% endif %}
-    {% set result = {
+        {% else %}
+            {{ log("No grants and revokes found in table: " ~ config_table_name, info=True) }}
+        {% endif %}
+        {% set result = {
         'unique_grants': unique_grants,
         'unique_revokes': unique_revokes
     } %}
-    {{ return(result) }}
+        {{ return(result) }}
+    {% else %}
+        {{ log("No identities found; skipping grants execution.", info=True) }}
+        {% set result = {
+        'unique_grants': unique_grants,
+        'unique_revokes': unique_revokes
+    } %}
+        {{ return(result) }}
+    {% endif %}
 {% endmacro %}
 
 {% macro get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}

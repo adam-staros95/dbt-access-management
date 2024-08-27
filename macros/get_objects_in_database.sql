@@ -16,7 +16,7 @@
     {% set objects_in_database_rows = run_query(query) %}
     {% if objects_in_database_rows %}
         {% for row in objects_in_database_rows %}
-            {% do objects_in_database.append(row[0]) %}
+            {% do objects_in_database.append(row.full_table_name) %}
         {% endfor %}
     {% endif %}
     {{ return(objects_in_database) }}
