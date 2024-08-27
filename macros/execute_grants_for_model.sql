@@ -12,7 +12,7 @@
             {% if database_identities | length > 0 %}
                 {% set identities_in_clause = identity_conditions | join(", ") %}
                 {% set query_config_table %}
-            SELECT grants::varchar AS grants
+            SELECT json_parse(grants::varchar) AS grants
             FROM access_management.{{project_name}}_config
             WHERE schema_name = '{{ this.schema }}'
             AND model_name = '{{ this.name }}'
@@ -24,9 +24,7 @@
                 {% set grant_queries = [] %}
 
                 {% for row in query_config_table_result.rows %}
-                    {{ log(row, info=True) }}
-                    {{ log(row.grants, info=True) }}
-                    {% do grant_queries.append(tojson("'"~row.grants~"'")) %}
+                    {% do grant_queries.append(fromjson(row.grants)) %}
                 {% endfor %}
 
                 {% set all_grants_for_a_model = [] %}

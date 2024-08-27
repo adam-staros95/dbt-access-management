@@ -2,7 +2,7 @@
     {% set create_temp_config_table_query %}
     {{ create_temp_config_table_query }}
     {% endset %}
-    {{ log("Creating temporary access config table" ~ temp_config_table_name, info=True) }}
+    {{ log("Creating temporary access config table " ~ temp_config_table_name, info=True) }}
     {% do run_query(create_temp_config_table_query) %}
     {% do validate_configured_identities(config_table_name=temp_config_table_name, should_stop_execution=True) %}
     {% set objects_in_database = get_objects_in_database() %}
@@ -71,8 +71,6 @@
         IN ({{ "'" ~ objects_in_database | join("', '") ~ "'" }})
         AND (identity_type, identity_name) IN ({{ identities_in_clause }});
         {% endset %}
-
-        {{ log(query_config_table, info=True) }}
 
         {% set grants_and_revokes = run_query(query_config_table) %}
         {% if grants_and_revokes %}

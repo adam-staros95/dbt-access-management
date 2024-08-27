@@ -108,28 +108,31 @@ CREATE TABLE access_management.{table_name} (
         revokes SUPER
     );
     """
-    create_table_sql += f"""
-    INSERT INTO access_management.{table_name}
-    (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes)
-    VALUES
-    """
+    if rows:
+        create_table_sql += f"""
+        INSERT INTO access_management.{table_name}
+        (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes)
+        VALUES
+        """
 
-    values = []
-    for row in rows:
-        value = (
-            f"('{row.project_name}', "
-            f"'{row.database_name}', "
-            f"'{row.schema_name}', "
-            f"'{row.model_name}', "
-            f"'{row.materialization}', "
-            f"'{row.identity_type}', "
-            f"'{row.identity_name}', "
-            f"'{json.dumps(list(row.grants))}', "
-            f"'{json.dumps(list(row.revokes))}')"
-        )
-        values.append(value)
+        values = []
+        for row in rows:
+            grants = json.dumps(list(row.grants)).replace("'", "''")
+            revokes = json.dumps(list(row.revokes)).replace("'", "''")
+            value = (
+                f"('{row.project_name}', "
+                f"'{row.database_name}', "
+                f"'{row.schema_name}', "
+                f"'{row.model_name}', "
+                f"'{row.materialization}', "
+                f"'{row.identity_type}', "
+                f"'{row.identity_name}', "
+                f"'{grants}', "
+                f"'{revokes}')"
+            )
+            values.append(value)
 
-    create_table_sql += ",\n".join(values) + ";"
+        create_table_sql += ",\n".join(values) + ";"
     return create_table_sql
 
 
@@ -214,7 +217,6 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
     type=str,
 )
 def dbt_am(dbt_command: str, config_file_path: str, database_name: str = None):
-    # TODO: Set max-line-length = 240 in .flake8
     # TODO: Add full-refresh flow with running macros
     #  execute_revoke_all_for_configured_entities and execute_grants_for_configured_entities
     command_list = list(
