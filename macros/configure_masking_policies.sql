@@ -1,4 +1,4 @@
-{% macro configure_masking_policies(masking_config_temp_table_name='pii_dev', masking_config_table_name='pii_dev') %}
+{% macro configure_masking_policies(masking_config_temp_table_name='pii_dev_temp', masking_config_table_name='pii_dev') %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set database_identities = get_database_identities() %}
     {% set currently_applied_masking_configs = get_masking_configs_in_database() %}
@@ -9,6 +9,9 @@
     {% set log_new_masking_configs_in_format_of_system_table = new_masking_configs_in_format_of_system_table | join('\n') %}
     {{ log("New:\n" ~ log_new_masking_configs_in_format_of_system_table, info=True) }}
 
+    {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
+    {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
+    {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
 
 {% endmacro %}
 
@@ -25,7 +28,8 @@
             'model_name': row.table_name,
             'column_name': fromjson(row.input_columns)[0],
             'grantee': row.grantee,
-            'grantee_type': row.grantee_type
+            'grantee_type': row.grantee_type,
+            'policy_name': row.policy_name
         }) %}
     {% endfor %}
     {{ return(masking_configs) }}
@@ -85,4 +89,72 @@
         }) %}
     {% endfor %}
     {{ return(mapped_masking_configs) }}
+{% endmacro %}
+
+
+{% macro get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
+    {% set removed_masking_configs = [] %}
+
+    {% for old_item in currently_applied_masking_configs %}
+        {% if {
+            'schema_name': old_item.schema_name,
+            'model_name': old_item.model_name,
+            'column_name': old_item.column_name,
+            'grantee': old_item.grantee,
+            'grantee_type': old_item.grantee_type
+        } not in new_masking_configs_in_format_of_system_table %}
+            {% do removed_masking_configs.append(old_item) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ log("Removed objects: " ~ removed_masking_configs, info=True) }}
+
+    {% do return(removed_masking_configs) %}
+{% endmacro %}
+
+
+{% macro get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
+    {% set new_masking_configs = [] %}
+
+    {% set currently_applied_masking_configs_without_policy_name = [] %}
+    {% for old_item in currently_applied_masking_configs %}
+        {% do currently_applied_masking_configs_without_policy_name.append(
+        {
+            'schema_name': old_item.schema_name,
+            'model_name': old_item.model_name,
+            'column_name': old_item.column_name,
+            'grantee': old_item.grantee,
+            'grantee_type': old_item.grantee_type
+        }
+    ) %}
+    {% endfor %}
+    {% for new_item in new_masking_configs_in_format_of_system_table %}
+        {% if new_item not in currently_applied_masking_configs_without_policy_name %}
+            {% do new_masking_configs.append(new_item) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ log("New objects: " ~ new_masking_configs, info=True) }}
+
+    {% do return(new_masking_configs) %}
+{% endmacro %}
+
+{% macro get_detach_policies_query(policies_to_detach) %}
+    {% set query %}
+
+    {% for policy_to_detach in policies_to_detach %}
+    detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ( {{ policy_to_detach['column_name'] }} )
+        {% if policy_to_detach['grantee'] == 'public' %}
+            from public;
+        {% elif policy_to_detach['grantee_type'] == 'role' %}
+            from {{ policy_to_detach['grantee_type'] }} "{{policy_to_detach['grantee']}}";
+        {% else %}
+            from "{{policy_to_detach['grantee']}}";
+        {% endif %}
+    {% endfor %}
+    {% endset %}
+
+    {{ log("Detach query: " ~ query, info=True) }}
+
+    {% do return(query) %}
 {% endmacro %}
