@@ -11,38 +11,37 @@
                 {% set columns = adapter.get_columns_in_relation(this) %}
 
                 {% set configure_masking_query -%}
-            {%- for masking_config in masking_configs -%}
-                {%- for col in columns -%}
-                    {%- if col.quoted == masking_config['column_name'] -%}
-                        {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(col.name, col.data_type) %}
-                        {%- if masking_policies['masking_policy'] is not none and  masking_policies['unmasking_policy'] is not none -%}
-                            ATTACH MASKING POLICY {{ masking_policies['masking_policy'] }}
-                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                            TO PUBLIC;
-                            {{ '\n' -}}
-                            {%- for user in fromjson(masking_config['users_with_access']) -%}
-                            {%- if user in users_identities -%}
-                            ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
-                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                            TO "{{ user }}" PRIORITY 10;
-                            {{ '\n' -}}
+                    {%- for masking_config in masking_configs -%}
+                        {%- for col in columns -%}
+                            {%- if col.quoted == masking_config['column_name'] -%}
+                                {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(col.name, col.data_type) %}
+                                {%- if masking_policies['masking_policy'] is not none and masking_policies['unmasking_policy'] is not none -%}
+                                    ATTACH MASKING POLICY {{ masking_policies['masking_policy'] }}
+                                    ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                                    TO PUBLIC;
+                                    {{ '\n' -}}
+                                    {%- for user in fromjson(masking_config['users_with_access']) -%}
+                                    {%- if user in users_identities -%}
+                                    ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
+                                    ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                                    TO "{{ user }}" PRIORITY 10;
+                                    {{ '\n' -}}
+                                    {%- endif -%}
+                                    {%- endfor -%}
+                                    {%- for role in fromjson(masking_config['roles_with_access']) -%}
+                                    {%- if role in roles_identities -%}
+                                    ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
+                                    ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
+                                    TO ROLE "{{ role }}" PRIORITY 10;
+                                    {{ '\n' -}}
+                                    {%- endif -%}
+                                    {%- endfor -%}
+                                {%- endif -%}
                             {%- endif -%}
-                            {%- endfor -%}
-                            {%- for role in fromjson(masking_config['roles_with_access']) -%}
-                            {%- if role in roles_identities -%}
-                            ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
-                            ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
-                            TO ROLE "{{ role }}" PRIORITY 10;
-                            {{ '\n' -}}
-                            {%- endif -%}
-                            {%- endfor -%}
-                        {%- endif -%}
-                    {% else %}
-                        {{ log('You configured masking for a column ' ~ masking_config['column_name'] ~ ' but this column does not exist in ' ~ ź ~ '.' ~ this.name, info=True) }}
-                    {%- endif -%}
-                {%- endfor -%}
-            {%- endfor -%}
+                        {%- endfor -%}
+                    {%- endfor -%}
                 {%- endset %}
+
                 {{ log(configure_masking_query, info=True) }}
                 {% do dbt.run_query(configure_masking_query) %}
             {% else %}

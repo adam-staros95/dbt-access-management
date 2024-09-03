@@ -1,4 +1,5 @@
 {% macro configure_masking_policies(masking_config_temp_table_name='pii_dev_temp', masking_config_table_name='pii_dev') %}
+    {% do create_project_related_masking_policies() %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set database_identities = get_database_identities() %}
     {% set currently_applied_masking_configs = get_masking_configs_in_database() %}
@@ -13,6 +14,7 @@
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
     {{ log("Detach query: " ~ detach_policies_query, info=True) }}
+    {% do dbt.run_query(detach_policies_query) %}
 --    TODO: {% set attach_policies_query = get_attach_policies_query(policies_to_attach) %}
 {% endmacro %}
 
