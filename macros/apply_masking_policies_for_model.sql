@@ -16,7 +16,7 @@
             {%- for masking_config in masking_configs -%}
                 {%- for col in columns -%}
                     {%- if col.quoted == masking_config['column_name'] -%}
---                    TODO: Do not use dbt build in functions
+--                    TODO: Do not use dbt build in functions, add function "Get masking policy for column type"
                         {%- if col.is_string() -%}
                             ATTACH MASKING POLICY {{ policy_names.MASK_VARCHAR }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})

@@ -13,7 +13,7 @@
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
     {{ log("Detach query: " ~ detach_policies_query, info=True) }}
-
+--    TODO: {% set attach_policies_query = get_attach_policies_query(policies_to_attach) %}
 {% endmacro %}
 
 {% macro get_masking_configs_in_database() %}
