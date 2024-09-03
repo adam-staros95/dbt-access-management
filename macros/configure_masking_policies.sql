@@ -12,6 +12,7 @@
     {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
+    {{ log("Detach query: " ~ detach_policies_query, info=True) }}
 
 {% endmacro %}
 
@@ -141,7 +142,6 @@
 
 {% macro get_detach_policies_query(policies_to_detach) %}
     {% set query %}
-
     {% for policy_to_detach in policies_to_detach %}
     detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ( {{ policy_to_detach['column_name'] }} )
         {% if policy_to_detach['grantee'] == 'public' %}
@@ -153,8 +153,5 @@
         {% endif %}
     {% endfor %}
     {% endset %}
-
-    {{ log("Detach query: " ~ query, info=True) }}
-
     {% do return(query) %}
 {% endmacro %}

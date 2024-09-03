@@ -3,7 +3,7 @@
         {% if config.get('materialized') != 'ephemeral' %}
             {% if not is_incremental() %}
 
-                {% set project_unique_id = dbt_access_management.generate_project_name_unique_id(project_name) %}
+                {% set policy_names = dbt_access_management.get_policy_names_constants() %}
 
                 {% set database_identities = dbt_access_management.get_database_identities() %}
                 {% set users_identities = dbt_access_management.get_users(database_identities) %}
@@ -16,16 +16,15 @@
             {%- for masking_config in masking_configs -%}
                 {%- for col in columns -%}
                     {%- if col.quoted == masking_config['column_name'] -%}
+--                    TODO: Do not use dbt build in functions
                         {%- if col.is_string() -%}
-                            {%- set masking_policy_name = project_name ~ '_mask_varchar_column_' ~ project_unique_id -%}
-                            {%- set unmasking_policy_name = project_name ~ '_unmask_varchar_column_' ~ project_unique_id -%}
-                            ATTACH MASKING POLICY {{ masking_policy_name }}
+                            ATTACH MASKING POLICY {{ policy_names.MASK_VARCHAR }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO PUBLIC;
                             {{ '\n' -}}
                             {%- for user in fromjson(masking_config['users_with_access']) -%}
                             {%- if user in users_identities -%}
-                            ATTACH MASKING POLICY {{ unmasking_policy_name }}
+                            ATTACH MASKING POLICY {{ policy_names.UNMASK_VARCHAR }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO "{{ user }}" PRIORITY 10;
                             {{ '\n' -}}
@@ -33,7 +32,7 @@
                             {%- endfor -%}
                             {%- for role in fromjson(masking_config['roles_with_access']) -%}
                             {%- if role in roles_identities -%}
-                            ATTACH MASKING POLICY {{ unmasking_policy_name }}
+                            ATTACH MASKING POLICY {{ policy_names.UNMASK_VARCHAR }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO ROLE "{{ role }}" PRIORITY 10;
                             {{ '\n' -}}
