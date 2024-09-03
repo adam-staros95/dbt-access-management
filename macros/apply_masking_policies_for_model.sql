@@ -3,8 +3,6 @@
         {% if config.get('materialized') != 'ephemeral' %}
             {% if not is_incremental() %}
 
-                {% set policy_names = dbt_access_management.get_policy_names_constants() %}
-
                 {% set database_identities = dbt_access_management.get_database_identities() %}
                 {% set users_identities = dbt_access_management.get_users(database_identities) %}
                 {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
@@ -16,15 +14,15 @@
             {%- for masking_config in masking_configs -%}
                 {%- for col in columns -%}
                     {%- if col.quoted == masking_config['column_name'] -%}
---                    TODO: Do not use dbt build in functions, add function "Get masking policy for column type"
-                        {%- if col.is_string() -%}
-                            ATTACH MASKING POLICY {{ policy_names.MASK_VARCHAR }}
+                        {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(col.name, col.data_type) %}
+                        {%- if masking_policies['masking_policy'] is not none and  masking_policies['unmasking_policy'] is not none -%}
+                            ATTACH MASKING POLICY {{ masking_policies['masking_policy'] }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO PUBLIC;
                             {{ '\n' -}}
                             {%- for user in fromjson(masking_config['users_with_access']) -%}
                             {%- if user in users_identities -%}
-                            ATTACH MASKING POLICY {{ policy_names.UNMASK_VARCHAR }}
+                            ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO "{{ user }}" PRIORITY 10;
                             {{ '\n' -}}
@@ -32,20 +30,21 @@
                             {%- endfor -%}
                             {%- for role in fromjson(masking_config['roles_with_access']) -%}
                             {%- if role in roles_identities -%}
-                            ATTACH MASKING POLICY {{ policy_names.UNMASK_VARCHAR }}
+                            ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
                             ON {{ this.schema }}.{{ this.name }}({{ masking_config['column_name'] }})
                             TO ROLE "{{ role }}" PRIORITY 10;
                             {{ '\n' -}}
                             {%- endif -%}
                             {%- endfor -%}
                         {%- endif -%}
+                    {% else %}
+                        {{ log('You configured masking for a column ' ~ masking_config['column_name'] ~ ' but this column does not exist in ' ~ ź ~ '.' ~ this.name, info=True) }}
                     {%- endif -%}
                 {%- endfor -%}
             {%- endfor -%}
                 {%- endset %}
                 {{ log(configure_masking_query, info=True) }}
                 {% do dbt.run_query(configure_masking_query) %}
-
             {% else %}
                 {{ log("Applying masking policies for incremental runs is not currently supported!", info=True) }}
             {% endif %}

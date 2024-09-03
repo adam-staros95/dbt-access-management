@@ -20,8 +20,16 @@
         "UNMASK_DECIMAL": project_name ~ '_unmask_decimal',
         "MASK_TIME": project_name ~ '_mask_time',
         "UNMASK_TIME": project_name ~ '_unmask_time',
+        "MASK_TIMETZ": project_name ~ '_mask_timetz',
+        "UNMASK_TIMETZ": project_name ~ '_unmask_timetz',
         "MASK_TIMESTAMP": project_name ~ '_mask_timestamp',
         "UNMASK_TIMESTAMP": project_name ~ '_unmask_timestamp',
+        "MASK_TIMESTAMPTZ": project_name ~ '_mask_timestamptz',
+        "UNMASK_TIMESTAMPTZ": project_name ~ '_unmask_timestamptz',
+        "MASK_BOOLEAN": project_name ~ '_mask_boolean',
+        "UNMASK_BOOLEAN": project_name ~ '_unmask_boolean',
+        "MASK_SUPER": project_name ~ '_mask_super',
+        "UNMASK_SUPER": project_name ~ '_unmask_super',
     } %}
     {% do return(policy_names) %}
 {% endmacro %}
