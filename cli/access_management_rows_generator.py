@@ -10,7 +10,6 @@ from cli.access_management_config_file_parser import (
 )
 from cli.constants import SUPPORTED_SQL_ENGINES
 from cli.model import ManifestNode, ModelType
-import os
 
 
 class AccessManagementRow(BaseModel):
@@ -45,13 +44,10 @@ def generate_access_management_rows(
             sorted_config_paths = sorted(
                 identity.config_paths, key=lambda x: x[0].count("/"), reverse=True
             )
-            if os.name == "nt":
-                node_for_system = node.path.replace("\\", "/")
-            else:
-                node_for_system = node
+
             for path, access_level in sorted_config_paths:
                 if node.model_type == ModelType.MODEL:
-                    if f"/{node_for_system.replace('.sql', '/')}".startswith(path):
+                    if f"/{node.path.replace('.sql', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
                             access_level, identity, node
                         )
@@ -61,7 +57,7 @@ def generate_access_management_rows(
                         break
 
                 if node.model_type == ModelType.SEED:
-                    if f"/{node_for_system.replace('.csv', '/')}".startswith(path):
+                    if f"/{node.path.replace('.csv', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
                             access_level, identity, node
                         )
