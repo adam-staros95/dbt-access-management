@@ -5,17 +5,16 @@
     {% set currently_applied_masking_configs = get_masking_configs_in_database() %}
     {% set new_masking_configs = get_new_masking_configs(masking_config_temp_table_name, objects_in_database) %}
     {% set new_masking_configs_in_format_of_system_table = map_new_configs_to_system_table_format(new_masking_configs) %}
-    {% set log_currently_applied_masking_configs = currently_applied_masking_configs | join('\n') %}
-    {{ log("Current:\n" ~ log_currently_applied_masking_configs, info=True) }}
-    {% set log_new_masking_configs_in_format_of_system_table = new_masking_configs_in_format_of_system_table | join('\n') %}
-    {{ log("New:\n" ~ log_new_masking_configs_in_format_of_system_table, info=True) }}
-
     {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
+    {% do validate_configured_data_masking_identities(policies_to_attach, database_identities) %}
     {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
-    {{ log("Detach query: " ~ detach_policies_query, info=True) }}
-    {% do dbt.run_query(detach_policies_query) %}
---    TODO: {% set attach_policies_query = get_attach_policies_query(policies_to_attach) %}
+    {{ log("Detach query: \n" ~ detach_policies_query, info=True) }}
+    {% if policies_to_attach | length > 0 %}
+        {% set table_column_types = get_table_column_types(policies_to_attach) %}
+        {% set attach_policies_query = get_attach_policies_query(policies_to_attach, table_column_types) %}
+        {{ log("Attach query: \n" ~ attach_policies_query, info=True) }}
+    {% endif %}
 {% endmacro %}
 
 {% macro get_masking_configs_in_database() %}
@@ -145,7 +144,7 @@
 {% macro get_detach_policies_query(policies_to_detach) %}
     {% set query %}
     {% for policy_to_detach in policies_to_detach %}
-    detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ( {{ policy_to_detach['column_name'] }} )
+    detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ({{ policy_to_detach['column_name'] }})
         {% if policy_to_detach['grantee'] == 'public' %}
             from public;
         {% elif policy_to_detach['grantee_type'] == 'role' %}
@@ -157,3 +156,95 @@
     {% endset %}
     {% do return(query) %}
 {% endmacro %}
+
+{% macro get_table_column_types(policies_to_attach) %}
+    {% set schema_table_conditions = [] %}
+    {% for policy in policies_to_attach %}
+        {% do schema_table_conditions.append(policy['schema_name'] ~ "." ~ policy['model_name']) %}
+    {% endfor %}
+
+    {% set query_information_schema_table %}
+        select table_schema, table_name, column_name, data_type
+        from svv_columns
+        where table_catalog = current_database()
+        and (table_schema || '.' || table_name) in ({{ "'" ~ schema_table_conditions | unique | join("', '") ~ "'" }})
+    {% endset %}
+
+    {% set table_column_types = [] %}
+    {% set query_information_schema_table_result = run_query(query_information_schema_table) %}
+    {% for row in query_information_schema_table_result.rows %}
+        {% do table_column_types.append(
+        {
+            'schema_name': row.table_schema,
+            'model_name': row.table_name,
+            'column_name': row.column_name,
+            'data_type': row.data_type
+        }
+    ) %}
+    {% endfor %}
+    {% do return(table_column_types) %}
+{% endmacro %}
+
+{% macro validate_configured_data_masking_identities(policies_to_attach, database_identities) %}
+    {% set users_identities = dbt_access_management.get_users(database_identities) %}
+    {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
+    {% set issues = [] %}
+    {% for policy_to_attach in policies_to_attach %}
+        {% if policy_to_attach['grantee_type'] != 'public' and (
+            (policy_to_attach['grantee_type'] == 'user' and policy_to_attach['grantee'] not in users_identities) or
+            (policy_to_attach['grantee_type'] == 'role' and policy_to_attach['grantee'] not in roles_identities)
+        ) %}
+            {% do issues.append(policy_to_attach['grantee_type'] ~ ' : ' ~ policy_to_attach['grantee']) %}
+        {% endif %}
+    {% endfor %}
+    {% if issues | length > 0 %}
+        {% set issue_message = "The following identities configured in DBT access management data masking, but do not exist in database:\n" ~ issues | unique | join(', ') %}
+        {{ exceptions.raise_compiler_error(issue_message) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro get_attach_policies_query(policies_to_attach, table_column_types) %}
+    {% set issues = [] %}
+    {%- set configure_masking_query -%}
+    {%- for policy_to_attach in policies_to_attach -%}
+        {% set ns = namespace (data_type = None) %}
+        {%- for table_column_type in table_column_types -%}
+            {% if policy_to_attach['schema_name'] == table_column_type['schema_name'] and
+                  policy_to_attach['model_name'] == table_column_type['model_name'] and
+                  policy_to_attach['column_name'] == table_column_type['column_name'] %}
+
+                {% set ns.data_type = table_column_type['data_type'] %}
+                {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(policy_to_attach['column_name'], ns.data_type) %}
+
+                {%- if masking_policies['masking_policy'] is not none and masking_policies['unmasking_policy'] is not none -%}
+                    {%- if policy_to_attach['grantee_type'] == 'public' -%}
+                        ATTACH MASKING POLICY {{ masking_policies['masking_policy'] }}
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        TO PUBLIC;
+                    {%- elif policy_to_attach['grantee_type'] == 'role' -%}
+                        ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        TO ROLE "{{ policy_to_attach['grantee'] }}" PRIORITY 10;
+                    {%- else -%}
+                        ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        TO "{{ policy_to_attach['grantee'] }}" PRIORITY 10;
+                    {%- endif -%}
+                {% endif %}
+                {% break %}
+            {% endif %}
+        {%- endfor -%}
+        {% if ns.data_type is none %}
+            {% do issues.append(policy_to_attach['schema_name'] ~ '.' ~ policy_to_attach['model_name'] ~ '.' ~ policy_to_attach['column_name']) %}
+        {% endif %}
+    {%- endfor -%}
+    {%- endset -%}
+
+    {% if issues | length > 0 %}
+        {% set issue_message = "You configured data masking for following columns which don't exist:\n" ~ issues | unique | join(', ') %}
+        {{ exceptions.raise_compiler_error(issue_message) }}
+    {% endif %}
+
+    {% do return(configure_masking_query) %}
+{% endmacro %}
+

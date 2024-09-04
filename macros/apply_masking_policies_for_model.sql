@@ -53,26 +53,6 @@
     {% endif %}
 {% endmacro %}
 
-{% macro get_users(database_identities) %}
-    {% set users = [] %}
-    {% for identity in database_identities %}
-        {% if identity['identity_type'] == 'user' %}
-            {% do users.append(identity['identity_name']) %}
-        {% endif %}
-    {% endfor %}
-    {{ return(users) }}
-{% endmacro %}
-
-{% macro get_roles(database_identities) %}
-    {% set roles = [] %}
-    {% for identity in database_identities %}
-        {% if identity['identity_type'] == 'role' %}
-            {% do roles.append(identity['identity_name']) %}
-        {% endif %}
-    {% endfor %}
-    {{ return(roles) }}
-{% endmacro %}
-
 {% macro get_masking_configs_for_model() %}
     {% set query_config_table %}
         select c.column_name, c.users_with_access, c.roles_with_access from access_management.pii_dev  as t, t.masking_config as c
