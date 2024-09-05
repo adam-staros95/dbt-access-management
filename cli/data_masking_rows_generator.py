@@ -1,6 +1,5 @@
 from typing import List, Dict
 from pydantic import BaseModel
-import os
 from cli.data_masking_config_file_parser import (
     DataMaskingConfig,
 )
@@ -30,13 +29,9 @@ def generate_data_masking_rows(
 
     for node in manifest_nodes:
         masking_config = []
-        if os.name == "nt":
-            node_for_system = node.path.replace("\\", "/")
-        else:
-            node_for_system = node
-        for table_config in data_masking_config.table_masking_identities:
-            if f"/{table_config.table_name}.sql" in node_for_system:
-                for column in table_config.column_masking_identities:
+        for model_config in data_masking_config.model_masking_identities:
+            if model_config.model_name == node.model_name:
+                for column in model_config.column_masking_identities:
                     masking_config.append(
                         {
                             "column_name": column.column_name,

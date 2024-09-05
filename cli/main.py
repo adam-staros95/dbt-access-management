@@ -21,6 +21,7 @@ from cli.data_masking_config_file_parser import (
 )
 from cli.data_masking_rows_generator import generate_data_masking_rows, DataMaskingRow
 from cli.model import ManifestNode, ModelType
+import os
 
 try:
     from dbt.artifacts.resources.types import NodeType
@@ -97,7 +98,9 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
                     model_name=node.name,
                     schema_name=node.schema,
                     materialization=node.config.materialized,
-                    path=node.original_file_path,
+                    path=node.original_file_path
+                    if os.name != "nt"
+                    else node.original_file_path.replace("\\", "/"),
                 )
             )
 
@@ -112,7 +115,9 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
                     model_name=node.name,
                     schema_name=node.schema,
                     materialization=node.config.materialized,
-                    path=node.original_file_path,
+                    path=node.original_file_path
+                    if os.name != "nt"
+                    else node.original_file_path.replace("\\", "/"),
                 )
             )
     return result
