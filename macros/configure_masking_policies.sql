@@ -1,4 +1,8 @@
 {% macro configure_masking_policies(masking_config_temp_table_name='pii_dev_temp', masking_config_table_name='pii_dev') %}
+    {% set detach_policies_query = '' %}
+    {% set attach_policies_query = '' %}
+
+
     {% do create_project_related_masking_policies() %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set database_identities = get_database_identities() %}
@@ -8,12 +12,22 @@
     {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% do validate_configured_data_masking_identities(policies_to_attach, database_identities) %}
-    {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
-    {{ log("Detach query: \n" ~ detach_policies_query, info=True) }}
+    {% if policies_to_detach | length > 0 %}
+        {% set detach_policies_query = get_detach_policies_query(policies_to_detach) %}
+    {% endif %}
     {% if policies_to_attach | length > 0 %}
         {% set table_column_types = get_table_column_types(policies_to_attach) %}
         {% set attach_policies_query = get_attach_policies_query(policies_to_attach, table_column_types) %}
-        {{ log("Attach query: \n" ~ attach_policies_query, info=True) }}
+    {% endif %}
+    {% if (policies_to_detach | length) > 0 or (policies_to_attach | length) > 0 %}
+        {% set configuration_query %}
+            -- Detach masking policies
+            {{detach_policies_query}}
+            -- Attach masking policies
+            {{attach_policies_query}}
+        {% endset %}
+        {{ log("Configure masking policies query: \n" ~ configuration_query, info=True) }}
+        {% do run_query(configuration_query) %}
     {% endif %}
 {% endmacro %}
 
@@ -109,8 +123,6 @@
         {% endif %}
     {% endfor %}
 
-    {{ log("Removed objects: " ~ removed_masking_configs, info=True) }}
-
     {% do return(removed_masking_configs) %}
 {% endmacro %}
 
@@ -136,14 +148,12 @@
         {% endif %}
     {% endfor %}
 
-    {{ log("New objects: " ~ new_masking_configs, info=True) }}
-
     {% do return(new_masking_configs) %}
 {% endmacro %}
 
 {% macro get_detach_policies_query(policies_to_detach) %}
     {% set query %}
-    {% for policy_to_detach in policies_to_detach %}
+    {%- for policy_to_detach in policies_to_detach -%}
     detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ({{ policy_to_detach['column_name'] }})
         {% if policy_to_detach['grantee'] == 'public' %}
             from public;
