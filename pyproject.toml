@@ -23,4 +23,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-dbt-am = "cli.main:dbt_am"
+dbt-am = "cli.main:cli"

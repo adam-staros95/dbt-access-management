@@ -16,3 +16,10 @@ class ManifestNode(BaseModel):
     schema_name: str
     materialization: str
     path: str
+
+
+class ConfigureMacroProperties(BaseModel):
+    temp_config_table_name: str
+    config_table_name: str
+    create_temp_config_table_query: str
+    create_config_table_query: str

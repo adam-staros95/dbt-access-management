@@ -1,10 +1,10 @@
-from cli.access_management_config_file_parser import (
+from cli.access_mangement.access_management_config_file_parser import (
     AccessConfigIdentity,
     IdentityType,
     AccessLevel,
     DataBaseAccessConfig,
 )
-from cli.access_management_rows_generator import (
+from cli.access_mangement.access_management_rows_generator import (
     AccessManagementRow,
     generate_access_management_rows,
 )
