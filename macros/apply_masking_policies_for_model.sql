@@ -55,7 +55,7 @@
 
 {% macro get_masking_configs_for_model() %}
     {% set query_config_table %}
-        select c.column_name, c.users_with_access, c.roles_with_access from access_management.pii_dev  as t, t.masking_config as c
+        select c.column_name, c.users_with_access, c.roles_with_access from access_management.{{project_name}}_data_masking_config  as t, t.masking_config as c
         where schema_name = '{{ this.schema }}' and model_name = '{{ this.name }}';
     {% endset %}
 

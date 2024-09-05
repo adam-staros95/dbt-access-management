@@ -237,24 +237,32 @@ def load_manifest(manifest_path: str) -> Manifest:
     return Manifest.from_dict(manifest_data)
 
 
-def run_configure_access_management_operation(
-    temp_config_table_name: str,
-    config_table_name: str,
-    create_temp_config_table_query: str,
-    create_config_table_query: str,
+def run_configure(
+    temp_access_management_config_table_name: str,
+    config_access_management_table_name: str,
+    create_temp_access_management_config_table_query: str,
+    create_access_management_config_table_query: str,
+    temp_data_masking_config_table_name: str,
+    config_data_masking_table_name: str,
+    create_temp_data_masking_config_table_query: str,
+    create_data_masking_config_table_query: str,
 ) -> None:
     click.echo("Configuring access management...")
     res = dbt.invoke(
         [
             "run-operation",
-            "dbt_access_management.configure_access_management",
+            "dbt_access_management.configure",
             "--args",
             json.dumps(
                 {
-                    "temp_config_table_name": temp_config_table_name,
-                    "config_table_name": config_table_name,
-                    "create_temp_config_table_query": create_temp_config_table_query,
-                    "create_config_table_query": create_config_table_query,
+                    "temp_access_management_config_table_name": temp_access_management_config_table_name,
+                    "config_access_management_table_name": config_access_management_table_name,
+                    "create_temp_access_management_config_table_query": create_temp_access_management_config_table_query,
+                    "create_access_management_config_table_query": create_access_management_config_table_query,
+                    "temp_data_masking_config_table_name": temp_data_masking_config_table_name,
+                    "config_data_masking_table_name": config_data_masking_table_name,
+                    "create_temp_data_masking_config_table_query": create_temp_data_masking_config_table_query,
+                    "create_data_masking_config_table_query": create_data_masking_config_table_query,
                 }
             ),
         ]
@@ -275,10 +283,16 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
     "--dbt-command", help="DBT command you want to execute.", type=str, required=True
 )
 @click.option(
-    "--config-file-path",
+    "--config-file-path-access-management",
     help="Path to the access management config file.",
     type=str,
     default="access_management.yml",
+)
+@click.option(
+    "--config-file-path-data-masking",
+    help="Path to the data masking config file.",
+    type=str,
+    default="data_masking.yml",
 )
 @click.option(
     "--database-name",
@@ -287,15 +301,9 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
     "multi project setup (for example using meshify or dbt-loom)",
     type=str,
 )
-@click.option(
-    "--config-file-path-data-masking",
-    help="Path to the data masking config file.",
-    type=str,
-    default="data_masking.yml",
-)
 def dbt_am(
     dbt_command: str,
-    config_file_path: str,
+    config_file_path_access_management: str,
     config_file_path_data_masking: str,
     database_name: str = None,
 ):
@@ -305,10 +313,11 @@ def dbt_am(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
     )
     target, variables = _get_target_and_vars(command_list)
-    access_management_config = parse_access_management_config(config_file_path)
     _invoke_compile_command(target, variables)
+    access_management_config = parse_access_management_config(
+        config_file_path_access_management
+    )
     data_masking_config = parse_data_masking_config(config_file_path_data_masking)
-    _invoke_compile_command(target, variables)
     manifest = load_manifest("target/manifest.json")
     project_name = manifest.metadata.project_name
     access_management_rows = get_access_management_rows(
@@ -317,29 +326,39 @@ def dbt_am(
     data_masking_rows = get_data_masking_rows(
         manifest, data_masking_config, project_name, database_name
     )
-    temp_config_table_name = f"temp_{project_name}_{int(time.time())}_config"
-    config_table_name = f"{project_name}_config"
-    temp_config_table_query = _build_create_config_table_sql(
-        access_management_rows, temp_config_table_name
+    temp_access_management_config_table_name = (
+        f"temp_{project_name}_{int(time.time())}_config"
     )
-    config_table_query = _build_create_config_table_sql(
-        access_management_rows, config_table_name
+    config_access_management_table_name = f"{project_name}_config"
+    create_temp_access_management_config_table_query = _build_create_config_table_sql(
+        access_management_rows, temp_access_management_config_table_name
+    )
+    create_access_management_config_table_query = _build_create_config_table_sql(
+        access_management_rows, config_access_management_table_name
     )
     temp_config_data_masking_table_name = (
         f"temp_{project_name}__data_masking_{int(time.time())}_config"
     )
     config_data_masking_table_name = f"{project_name}_data_masking_config"
-    temp_config_data_masking_table_query = _build_create_data_masking_config_table_sql(
-        data_masking_rows, temp_config_data_masking_table_name
+    create_temp_data_masking_config_table_query = (
+        _build_create_data_masking_config_table_sql(
+            data_masking_rows, temp_config_data_masking_table_name
+        )
     )
-    config_data_masking_table_query = _build_create_data_masking_config_table_sql(
-        data_masking_rows, config_data_masking_table_name
+    create_data_masking_config_table_query = (
+        _build_create_data_masking_config_table_sql(
+            data_masking_rows, config_data_masking_table_name
+        )
     )
-    run_configure_access_management_operation(
-        temp_config_table_name,
-        config_table_name,
-        temp_config_table_query,
-        config_table_query,
+    run_configure(
+        temp_access_management_config_table_name=temp_access_management_config_table_name,
+        config_access_management_table_name=config_access_management_table_name,
+        create_temp_access_management_config_table_query=create_temp_access_management_config_table_query,
+        create_access_management_config_table_query=create_access_management_config_table_query,
+        temp_data_masking_config_table_name=temp_config_data_masking_table_name,
+        config_data_masking_table_name=config_data_masking_table_name,
+        create_temp_data_masking_config_table_query=create_temp_data_masking_config_table_query,
+        create_data_masking_config_table_query=create_data_masking_config_table_query,
     )
     _invoke_passed_dbt_command(command_list)
 

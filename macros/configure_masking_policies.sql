@@ -1,13 +1,15 @@
-{% macro configure_masking_policies(masking_config_temp_table_name='pii_dev_temp', masking_config_table_name='pii_dev') %}
+{% macro configure_masking_policies(temp_data_masking_config_table_name, config_data_masking_table_name, create_temp_data_masking_config_table_query, create_data_masking_config_table_query) %}
     {% set detach_policies_query = '' %}
     {% set attach_policies_query = '' %}
 
+    {{ log("Creating temporary dynamic data masking config table " ~ temp_data_masking_config_table_name, info=True) }}
+    {% do run_query(create_temp_data_masking_config_table_query) %}
 
     {% do create_project_related_masking_policies() %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set database_identities = get_database_identities() %}
     {% set currently_applied_masking_configs = get_masking_configs_in_database() %}
-    {% set new_masking_configs = get_new_masking_configs(masking_config_temp_table_name, objects_in_database) %}
+    {% set new_masking_configs = get_new_masking_configs(temp_data_masking_config_table_name, objects_in_database) %}
     {% set new_masking_configs_in_format_of_system_table = map_new_configs_to_system_table_format(new_masking_configs) %}
     {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
     {% set policies_to_attach = get_policies_to_attach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
@@ -29,6 +31,14 @@
         {{ log("Configure masking policies query: \n" ~ configuration_query, info=True) }}
         {% do run_query(configuration_query) %}
     {% endif %}
+
+    {% set drop_temp_config_data_masking_table_query %}
+        DROP TABLE access_management.{{temp_data_masking_config_table_name}};
+    {% endset %}
+
+    {% do run_query(create_data_masking_config_table_query) %}
+    {{ log(drop_temp_config_data_masking_table_query, info=True) }}
+    {% do run_query(drop_temp_config_data_masking_table_query) %}
 {% endmacro %}
 
 {% macro get_masking_configs_in_database() %}
@@ -51,10 +61,10 @@
     {{ return(masking_configs) }}
 {% endmacro %}
 
-{% macro get_new_masking_configs(masking_config_temp_table_name, objects_in_database) %}
+{% macro get_new_masking_configs(temp_data_masking_config_table_name, objects_in_database) %}
     {% set query_config_table %}
         select t.schema_name, t.model_name, c.column_name, c.users_with_access, c.roles_with_access
-        from access_management.{{ masking_config_temp_table_name }} as t, t.masking_config as c
+        from access_management.{{ temp_data_masking_config_table_name }} as t, t.masking_config as c
         where t.database_name || '.' || t.schema_name || '.' || t.model_name || '.' ||  case
             when lower(t.materialization) = 'view' then 'view'  else 'table' end
         in ({{ "'" ~ objects_in_database | join("', '") ~ "'" }});
@@ -257,4 +267,3 @@
 
     {% do return(configure_masking_query) %}
 {% endmacro %}
-
