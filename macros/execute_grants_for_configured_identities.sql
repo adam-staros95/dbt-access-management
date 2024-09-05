@@ -13,7 +13,7 @@
         {% set identities_in_clause = identity_conditions | join(", ") %}
         {% set query_config_table %}
         SELECT json_parse(grants::varchar) as grants
-        FROM access_management.{{project_name}}_config
+        FROM access_management.{{project_name}}_access_management_config
         WHERE database_name || '.' || schema_name || '.' || model_name || '.' ||  CASE
             WHEN lower(materialization) = 'view' THEN 'view'  ELSE 'table' END
         IN ({{ "'" ~ objects_in_database | join("', '") ~ "'" }})

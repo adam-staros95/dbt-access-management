@@ -327,9 +327,9 @@ def dbt_am(
         manifest, data_masking_config, project_name, database_name
     )
     temp_access_management_config_table_name = (
-        f"temp_{project_name}_{int(time.time())}_config"
+        f"temp_{project_name}_{int(time.time())}_access_management_config"
     )
-    config_access_management_table_name = f"{project_name}_config"
+    config_access_management_table_name = f"{project_name}_access_management_config"
     create_temp_access_management_config_table_query = _build_create_config_table_sql(
         access_management_rows, temp_access_management_config_table_name
     )
@@ -337,7 +337,7 @@ def dbt_am(
         access_management_rows, config_access_management_table_name
     )
     temp_config_data_masking_table_name = (
-        f"temp_{project_name}__data_masking_{int(time.time())}_config"
+        f"temp_{project_name}_data_masking_{int(time.time())}_config"
     )
     config_data_masking_table_name = f"{project_name}_data_masking_config"
     create_temp_data_masking_config_table_query = (
