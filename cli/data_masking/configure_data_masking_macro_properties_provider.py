@@ -55,16 +55,16 @@ CREATE TABLE access_management.{table_name} (
 def get_configure_data_masking_macro_properties(
     manifest_nodes: List[ManifestNode],
     config_file_path: str,
-    sql_engine: str,
     project_name: str,
 ) -> ConfigureMacroProperties:
     data_masking_config = parse_data_masking_config(config_file_path)
     data_masking_rows = generate_data_masking_rows(data_masking_config, manifest_nodes)
+
     temp_data_masking_config_table_name = (
         f"temp_{project_name}_{int(time.time())}_data_masking_config"
     )
-
     config_data_masking_table_name = f"{project_name}_data_masking_config"
+
     create_temp_data_masking_config_table_query = (
         _build_create_data_masking_config_table_sql(
             data_masking_rows, temp_data_masking_config_table_name, project_name

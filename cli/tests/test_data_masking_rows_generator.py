@@ -1,9 +1,9 @@
-from cli.data_masking_config_file_parser import (
-    ColumnMaskingConfig,
+from cli.data_masking.data_masking_config_file_parser import (
     DataMaskingConfig,
     ModelDataMaskingConfig,
+    ColumnMaskingConfig,
 )
-from cli.data_masking_rows_generator import (
+from cli.data_masking.data_masking_rows_generator import (
     DataMaskingRow,
     generate_data_masking_rows,
 )
@@ -41,7 +41,7 @@ def test_generate_data_masking_rows_not_matching_models():
             masking_config=[],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result
 
 
@@ -84,7 +84,7 @@ def test_generate_data_masking_rows_one_column_without_access():
             ],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result
 
 
@@ -129,7 +129,7 @@ def test_generate_data_masking_rows_one_user_with_access():
             ],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result
 
 
@@ -174,7 +174,7 @@ def test_generate_data_masking_rows_one_role_with_access():
             ],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result
 
 
@@ -219,7 +219,7 @@ def test_generate_data_masking_rows_one_column_many_roles_and_users_with_access(
             ],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result
 
 
@@ -284,5 +284,5 @@ def test_generate_data_masking_rows_many_columns_with_roles_and_users_with_acces
             ],
         )
     ]
-    result = generate_data_masking_rows(data_masking_config, manifest_nodes, "redshift")
+    result = generate_data_masking_rows(data_masking_config, manifest_nodes)
     assert result == expected_result

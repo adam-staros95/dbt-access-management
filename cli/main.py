@@ -1,7 +1,7 @@
 import json
 import os
 import shlex
-from typing import List, Tuple
+from typing import List
 
 import click
 from dbt.cli.main import dbtRunner
@@ -276,7 +276,6 @@ def configure(
             get_configure_data_masking_macro_properties(
                 manifest_nodes=manifest_nodes,
                 config_file_path=data_masking_config_file_path,
-                sql_engine=sql_engine,
                 project_name=project_name,
             )
         )
