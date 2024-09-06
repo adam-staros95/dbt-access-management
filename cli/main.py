@@ -1,27 +1,24 @@
 import json
+import os
 import shlex
-import time
-from typing import List, Tuple
+from typing import List
 
 import click
 from dbt.cli.main import dbtRunner
 from dbt.contracts.graph.manifest import Manifest
 
-from cli.access_management_config_file_parser import (
-    parse_access_management_config,
-    AccessManagementConfig,
+from cli.access_mangement.configure_access_management_macro_properties_provider import (
+    get_configure_access_management_macro_properties,
 )
-from cli.access_management_rows_generator import (
-    generate_access_management_rows,
-    AccessManagementRow,
+from cli.constants import SUPPORTED_SQL_ENGINES
+from cli.data_masking.configure_data_masking_macro_properties_provider import (
+    get_configure_data_masking_macro_properties,
 )
-from cli.data_masking_config_file_parser import (
-    parse_data_masking_config,
-    DataMaskingConfig,
+from cli.exceptions import (
+    MultipleDatabaseNamesException,
+    SQLEngineNotSupportedException,
 )
-from cli.data_masking_rows_generator import generate_data_masking_rows, DataMaskingRow
-from cli.model import ManifestNode, ModelType
-import os
+from cli.model import ManifestNode, ModelType, ConfigureMacroProperties
 
 try:
     from dbt.artifacts.resources.types import NodeType
@@ -31,57 +28,7 @@ except ModuleNotFoundError:
 dbt = dbtRunner()
 
 
-def get_access_management_rows(
-    manifest: Manifest,
-    access_management_config: AccessManagementConfig,
-    project_name: str,
-    database_name: str = None,
-) -> List[AccessManagementRow]:
-    sql_engine = manifest.metadata.adapter_type
-    manifest_nodes = _get_nodes_eligible_for_access_management_from_manifest_file(
-        manifest, project_name
-    )
-    db_name_from_manifest_file = {n.database_name for n in manifest_nodes}
-    if len(db_name_from_manifest_file) > 1:
-        raise Exception(
-            f"Multiple database names found: {', '.join(db_name_from_manifest_file)} in your DBT project.\n"
-            f"Most probably you use multi project setup with cross database queries.\n"
-            f"Please provide `--database-name` parameter to the command!\n"
-        )
-    db_name = database_name if database_name else list(db_name_from_manifest_file)[0]
-    click.echo(f"Access management will be configured on the: `{db_name}` database")
-    for database_access_config in access_management_config.databases_access_config:
-        if database_access_config.database_name == db_name:
-            return generate_access_management_rows(
-                database_access_config, manifest_nodes, project_name, sql_engine
-            )
-    return []
-
-
-def get_data_masking_rows(
-    manifest: Manifest,
-    data_masking_config: DataMaskingConfig,
-    project_name: str,
-    database_name: str = None,
-) -> List[DataMaskingRow]:
-    sql_engine = manifest.metadata.adapter_type
-    manifest_nodes = _get_nodes_eligible_for_access_management_from_manifest_file(
-        manifest, project_name
-    )
-    db_name_from_manifest_file = {n.database_name for n in manifest_nodes}
-    if len(db_name_from_manifest_file) > 1:
-        raise Exception(
-            f"Multiple database names found: {', '.join(db_name_from_manifest_file)} in your DBT project.\n"
-            f"Most probably you use multi project setup with cross database queries.\n"
-            f"Please provide `--database-name` parameter to the command!\n"
-        )
-    db_name = database_name if database_name else list(db_name_from_manifest_file)[0]
-    click.echo(f"Access management will be configured on the: `{db_name}` database")
-
-    return generate_data_masking_rows(data_masking_config, manifest_nodes, sql_engine)
-
-
-def _get_nodes_eligible_for_access_management_from_manifest_file(
+def _get_manifest_nodes_eligible_for_configuration(
     manifest: Manifest, project_name: str
 ) -> List[ManifestNode]:
     result = []
@@ -123,103 +70,33 @@ def _get_nodes_eligible_for_access_management_from_manifest_file(
     return result
 
 
-def _build_create_config_table_sql(
-    rows: List[AccessManagementRow], table_name: str
-) -> str:
-    create_table_sql = f"""
-CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.{table_name};
-CREATE TABLE access_management.{table_name} (
-        project_name TEXT,
-        database_name TEXT,
-        schema_name TEXT,
-        model_name TEXT,
-        materialization TEXT,
-        identity_type TEXT,
-        identity_name TEXT,
-        grants SUPER,
-        revokes SUPER
-    );
-    """
-    if rows:
-        create_table_sql += f"""
-        INSERT INTO access_management.{table_name}
-        (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes)
-        VALUES
-        """
-
-        values = []
-        for row in rows:
-            grants = json.dumps(list(row.grants)).replace("'", "''")
-            revokes = json.dumps(list(row.revokes)).replace("'", "''")
-            value = (
-                f"('{row.project_name}', "
-                f"'{row.database_name}', "
-                f"'{row.schema_name}', "
-                f"'{row.model_name}', "
-                f"'{row.materialization}', "
-                f"'{row.identity_type}', "
-                f"'{row.identity_name}', "
-                f"'{grants}', "
-                f"'{revokes}')"
-            )
-            values.append(value)
-
-        create_table_sql += ",\n".join(values) + ";"
-    return create_table_sql
+def _get_database_name(manifest_nodes: List[ManifestNode], database_name: str = None):
+    db_name_from_manifest_file = {n.database_name for n in manifest_nodes}
+    if len(db_name_from_manifest_file) > 1:
+        raise MultipleDatabaseNamesException(db_name_from_manifest_file)
+    return database_name if database_name else list(db_name_from_manifest_file)[0]
 
 
-def _build_create_data_masking_config_table_sql(
-    rows: List[DataMaskingRow], table_name: str
-) -> str:
-    create_table_sql = f"""
-CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.{table_name};
-CREATE TABLE access_management.{table_name} (
-        database_name TEXT,
-        schema_name TEXT,
-        model_name TEXT,
-        materialization TEXT,
-        masking_config SUPER
-    );
-    """
-
-    if rows:
-        create_table_sql += f"""
-        INSERT INTO access_management.{table_name}
-        (database_name, schema_name, model_name, materialization, masking_config)
-        VALUES
-        """
-
-        values = []
-        for row in rows:
-            masking_config = json.dumps(list(row.masking_config)).replace("'", "''")
-            value = (
-                f"('{row.database_name}', "
-                f"'{row.schema_name}', "
-                f"'{row.model_name}', "
-                f"'{row.materialization}', "
-                f"JSON_PARSE('{(masking_config)}'))"
-            )
-            values.append(value)
-
-        create_table_sql += ",\n".join(values) + ";"
-    return create_table_sql
-
-
-def _get_target_and_vars(command_list: List[str]) -> Tuple[str, str]:
-    target = None
-    variables = None
-    for i in range(len(command_list)):
-        if command_list[i] == "--target":
-            target = command_list[i + 1] if i + 1 < len(command_list) else None
-        elif command_list[i] == "--vars":
-            variables = command_list[i + 1] if i + 1 < len(command_list) else None
-    return target, variables
-
-
-def _invoke_compile_command(target: str, variables: str) -> None:
+def _invoke_compile_command(command_list: List[str]) -> None:
     click.echo("Compiling project...")
+
+    target = next(
+        (
+            command_list[i + 1]
+            for i in range(len(command_list) - 1)
+            if command_list[i] == "--target"
+        ),
+        None,
+    )
+    variables = next(
+        (
+            command_list[i + 1]
+            for i in range(len(command_list) - 1)
+            if command_list[i] == "--vars"
+        ),
+        None,
+    )
+
     cmd = ["compile"]
     if target:
         cmd.extend(["--target", target])
@@ -230,45 +107,81 @@ def _invoke_compile_command(target: str, variables: str) -> None:
         exit(1)
 
 
-def load_manifest(manifest_path: str) -> Manifest:
+def load_manifest(manifest_path: str = "target/manifest.json") -> Manifest:
     with open(manifest_path, "r") as file:
         manifest_data = json.load(file)
 
     return Manifest.from_dict(manifest_data)
 
 
-def run_configure(
-    temp_access_management_config_table_name: str,
-    config_access_management_table_name: str,
-    create_temp_access_management_config_table_query: str,
-    create_access_management_config_table_query: str,
-    temp_data_masking_config_table_name: str,
-    config_data_masking_table_name: str,
-    create_temp_data_masking_config_table_query: str,
-    create_data_masking_config_table_query: str,
+def run_configure_macro(
+    configure_access_management_macro_properties: ConfigureMacroProperties = None,
+    configure_data_masking_macro_properties: ConfigureMacroProperties = None,
 ) -> None:
-    click.echo("Configuring access management...")
-    res = dbt.invoke(
-        [
-            "run-operation",
-            "dbt_access_management.configure",
-            "--args",
-            json.dumps(
-                {
-                    "temp_access_management_config_table_name": temp_access_management_config_table_name,
-                    "config_access_management_table_name": config_access_management_table_name,
-                    "create_temp_access_management_config_table_query": create_temp_access_management_config_table_query,
-                    "create_access_management_config_table_query": create_access_management_config_table_query,
-                    "temp_data_masking_config_table_name": temp_data_masking_config_table_name,
-                    "config_data_masking_table_name": config_data_masking_table_name,
-                    "create_temp_data_masking_config_table_query": create_temp_data_masking_config_table_query,
-                    "create_data_masking_config_table_query": create_data_masking_config_table_query,
-                }
+    def prepare_access_management_args(
+        configure_properties: ConfigureMacroProperties,
+    ) -> dict:
+        return {
+            "temp_access_management_config_table_name": configure_properties.temp_config_table_name,
+            "config_access_management_table_name": configure_properties.config_table_name,
+            "create_temp_access_management_config_table_query": configure_properties.create_temp_config_table_query,
+            "create_access_management_config_table_query": configure_properties.create_config_table_query,
+        }
+
+    def prepare_data_masking_args(
+        configure_properties: ConfigureMacroProperties,
+    ) -> dict:
+        return {
+            "temp_data_masking_config_table_name": configure_properties.temp_config_table_name,
+            "config_data_masking_table_name": configure_properties.config_table_name,
+            "create_temp_data_masking_config_table_query": configure_properties.create_temp_config_table_query,
+            "create_data_masking_config_table_query": configure_properties.create_config_table_query,
+        }
+
+    def run_dbt_operation(operation_name: str, args: dict) -> None:
+        res = dbt.invoke(
+            [
+                "run-operation",
+                operation_name,
+                "--args",
+                json.dumps(args),
+            ]
+        )
+        if not res.success:
+            exit(1)
+
+    if (
+        configure_access_management_macro_properties
+        and configure_data_masking_macro_properties
+    ):
+        click.echo("Configuring access management and data masking...")
+        combined_args = {
+            **prepare_access_management_args(
+                configure_access_management_macro_properties
             ),
-        ]
-    )
-    if not res.success:
-        exit(1)
+            **prepare_data_masking_args(configure_data_masking_macro_properties),
+        }
+        run_dbt_operation("dbt_access_management.configure", combined_args)
+
+    else:
+        if configure_access_management_macro_properties:
+            click.echo("Configuring access management...")
+            access_management_args = prepare_access_management_args(
+                configure_access_management_macro_properties
+            )
+            run_dbt_operation(
+                "dbt_access_management.configure_access_management",
+                access_management_args,
+            )
+
+        if configure_data_masking_macro_properties:
+            click.echo("Configuring data masking...")
+            data_masking_args = prepare_data_masking_args(
+                configure_data_masking_macro_properties
+            )
+            run_dbt_operation(
+                "dbt_access_management.configure_data_masking", data_masking_args
+            )
 
 
 def _invoke_passed_dbt_command(command_list: List[str]) -> None:
@@ -278,18 +191,37 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
         exit(1)
 
 
+@click.group()
+def cli():
+    pass
+
+
 @click.command()
 @click.option(
     "--dbt-command", help="DBT command you want to execute.", type=str, required=True
 )
 @click.option(
-    "--config-file-path-access-management",
+    "--configure-access-management",
+    help="Set to false to disable access management configuration",
+    type=bool,
+    required=True,
+    default=True,
+)
+@click.option(
+    "--configure-data-masking",
+    help="Set to false to disable data masking configuration",
+    type=bool,
+    required=True,
+    default=True,
+)
+@click.option(
+    "--access-management-config-file-path",
     help="Path to the access management config file.",
     type=str,
     default="access_management.yml",
 )
 @click.option(
-    "--config-file-path-data-masking",
+    "--data-masking-config-file-path",
     help="Path to the data masking config file.",
     type=str,
     default="data_masking.yml",
@@ -297,71 +229,69 @@ def _invoke_passed_dbt_command(command_list: List[str]) -> None:
 @click.option(
     "--database-name",
     help="Database name for which you want to configure access management. "
-    "It it highly recommended to specify database name in "
+    "It it required to specify database name in "
     "multi project setup (for example using meshify or dbt-loom)",
     type=str,
 )
-def dbt_am(
+def configure(
     dbt_command: str,
-    config_file_path_access_management: str,
-    config_file_path_data_masking: str,
+    configure_access_management: bool,
+    configure_data_masking: bool,
+    access_management_config_file_path: str,
+    data_masking_config_file_path: str,
     database_name: str = None,
 ):
-    # TODO: Add full-refresh flow with running macros
-    #  execute_revoke_all_for_configured_identities and execute_grants_for_configured_identities
     command_list = list(
         filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
     )
-    target, variables = _get_target_and_vars(command_list)
-    _invoke_compile_command(target, variables)
-    access_management_config = parse_access_management_config(
-        config_file_path_access_management
-    )
-    data_masking_config = parse_data_masking_config(config_file_path_data_masking)
-    manifest = load_manifest("target/manifest.json")
+    _invoke_compile_command(command_list)
+
+    manifest = load_manifest()
     project_name = manifest.metadata.project_name
-    access_management_rows = get_access_management_rows(
-        manifest, access_management_config, project_name, database_name
+    sql_engine = manifest.metadata.adapter_type
+    if sql_engine.lower() not in SUPPORTED_SQL_ENGINES:
+        raise SQLEngineNotSupportedException()
+
+    manifest_nodes = _get_manifest_nodes_eligible_for_configuration(
+        manifest, project_name
     )
-    data_masking_rows = get_data_masking_rows(
-        manifest, data_masking_config, project_name, database_name
-    )
-    temp_access_management_config_table_name = (
-        f"temp_{project_name}_{int(time.time())}_config"
-    )
-    config_access_management_table_name = f"{project_name}_config"
-    create_temp_access_management_config_table_query = _build_create_config_table_sql(
-        access_management_rows, temp_access_management_config_table_name
-    )
-    create_access_management_config_table_query = _build_create_config_table_sql(
-        access_management_rows, config_access_management_table_name
-    )
-    temp_config_data_masking_table_name = (
-        f"temp_{project_name}__data_masking_{int(time.time())}_config"
-    )
-    config_data_masking_table_name = f"{project_name}_data_masking_config"
-    create_temp_data_masking_config_table_query = (
-        _build_create_data_masking_config_table_sql(
-            data_masking_rows, temp_config_data_masking_table_name
+    database_name = _get_database_name(manifest_nodes, database_name)
+
+    configure_access_management_macro_properties = (
+        (
+            get_configure_access_management_macro_properties(
+                manifest_nodes=manifest_nodes,
+                config_file_path=access_management_config_file_path,
+                sql_engine=sql_engine,
+                database_name=database_name,
+                project_name=project_name,
+            )
         )
+        if configure_access_management
+        else None
     )
-    create_data_masking_config_table_query = (
-        _build_create_data_masking_config_table_sql(
-            data_masking_rows, config_data_masking_table_name
+
+    configure_data_masking_macro_properties = (
+        (
+            get_configure_data_masking_macro_properties(
+                manifest_nodes=manifest_nodes,
+                config_file_path=data_masking_config_file_path,
+                project_name=project_name,
+            )
         )
+        if configure_data_masking
+        else None
     )
-    run_configure(
-        temp_access_management_config_table_name=temp_access_management_config_table_name,
-        config_access_management_table_name=config_access_management_table_name,
-        create_temp_access_management_config_table_query=create_temp_access_management_config_table_query,
-        create_access_management_config_table_query=create_access_management_config_table_query,
-        temp_data_masking_config_table_name=temp_config_data_masking_table_name,
-        config_data_masking_table_name=config_data_masking_table_name,
-        create_temp_data_masking_config_table_query=create_temp_data_masking_config_table_query,
-        create_data_masking_config_table_query=create_data_masking_config_table_query,
+
+    run_configure_macro(
+        configure_access_management_macro_properties=configure_access_management_macro_properties,
+        configure_data_masking_macro_properties=configure_data_masking_macro_properties,
     )
+
     _invoke_passed_dbt_command(command_list)
 
 
+cli.add_command(configure)
+
 if __name__ == "__main__":
-    dbt_am()
+    cli()

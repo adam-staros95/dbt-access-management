@@ -1,4 +1,9 @@
+from enum import Enum
 from typing import List
 
-# TODO: Make enum `SQL_ENGINE`
-SUPPORTED_SQL_ENGINES: List[str] = ["redshift"]
+
+class SQLEngine(str, Enum):
+    REDSHIFT = "redshift"
+
+
+SUPPORTED_SQL_ENGINES: List[SQLEngine] = [SQLEngine.REDSHIFT]

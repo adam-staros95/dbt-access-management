@@ -1,10 +1,10 @@
 from typing import List, Dict
+
 from pydantic import BaseModel
-from cli.data_masking_config_file_parser import (
+
+from cli.data_masking.data_masking_config_file_parser import (
     DataMaskingConfig,
 )
-
-from cli.constants import SUPPORTED_SQL_ENGINES
 from cli.model import ManifestNode
 
 
@@ -19,12 +19,7 @@ class DataMaskingRow(BaseModel):
 def generate_data_masking_rows(
     data_masking_config: DataMaskingConfig,
     manifest_nodes: List[ManifestNode],
-    sql_engine: str,
 ) -> List[DataMaskingRow]:
-    if sql_engine not in SUPPORTED_SQL_ENGINES:
-        raise Exception(
-            f"Currently supported sql engines are: {', '.join(SUPPORTED_SQL_ENGINES)}"
-        )
     data_masking_rows = []
 
     for node in manifest_nodes:

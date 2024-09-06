@@ -5,6 +5,8 @@ from typing import List, Any, Dict, Tuple
 import yaml
 from pydantic import BaseModel
 
+from cli.exceptions import AccessManagementConfigFileNotFoundException
+
 
 class IdentityType(str, Enum):
     USER = "user"
@@ -36,6 +38,9 @@ class AccessManagementConfig(BaseModel):
 
 def _read_config_file(config_file_path: str) -> Dict[str, Any]:
     file_path = os.path.join(config_file_path)
+
+    if not os.path.exists(file_path):
+        raise AccessManagementConfigFileNotFoundException(file_path)
 
     with open(file_path, "r") as file:
         return yaml.safe_load(file)

@@ -1,4 +1,4 @@
-{% macro configure_masking_policies(temp_data_masking_config_table_name, config_data_masking_table_name, create_temp_data_masking_config_table_query, create_data_masking_config_table_query) %}
+{% macro configure_data_masking(temp_data_masking_config_table_name, config_data_masking_table_name, create_temp_data_masking_config_table_query, create_data_masking_config_table_query) %}
     {% set detach_policies_query = '' %}
     {% set attach_policies_query = '' %}
 
