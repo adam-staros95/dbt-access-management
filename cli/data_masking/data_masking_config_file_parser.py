@@ -4,6 +4,8 @@ from typing import List, Any, Dict
 import yaml
 from pydantic import BaseModel
 
+from cli.exceptions import DataMaskingConfigFileNotFoundException
+
 
 class ColumnMaskingConfig(BaseModel):
     column_name: str
@@ -22,6 +24,9 @@ class DataMaskingConfig(BaseModel):
 
 def _read_config_file(config_file_path: str) -> Dict[str, Any]:
     file_path = os.path.join(config_file_path)
+
+    if not os.path.exists(file_path):
+        raise DataMaskingConfigFileNotFoundException(file_path)
 
     with open(file_path, "r") as file:
         return yaml.safe_load(file)

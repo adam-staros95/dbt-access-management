@@ -107,7 +107,7 @@ def _invoke_compile_command(command_list: List[str]) -> None:
         exit(1)
 
 
-def load_manifest(manifest_path: str) -> Manifest:
+def load_manifest(manifest_path: str = "target/manifest.json") -> Manifest:
     with open(manifest_path, "r") as file:
         manifest_data = json.load(file)
 
@@ -246,7 +246,7 @@ def configure(
     )
     _invoke_compile_command(command_list)
 
-    manifest = load_manifest("target/manifest.json")
+    manifest = load_manifest()
     project_name = manifest.metadata.project_name
     sql_engine = manifest.metadata.adapter_type
     if sql_engine.lower() not in SUPPORTED_SQL_ENGINES:

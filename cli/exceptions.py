@@ -16,7 +16,6 @@ class MultipleDatabaseNamesException(Exception):
 class DatabaseAccessManagementConfigNotExistsException(Exception):
     def __init__(self, db_name: str):
         message = f"Access management config for database: {db_name} not specified!"
-
         super().__init__(message)
 
 
@@ -25,5 +24,18 @@ class SQLEngineNotSupportedException(Exception):
         message = (
             f"Currently supported sql engines are: {', '.join(SUPPORTED_SQL_ENGINES)}"
         )
+        super().__init__(message)
 
+
+class AccessManagementConfigFileNotFoundException(Exception):
+    def __init__(self, file_path: str):
+        message = (
+            f"Access management configuration file not found in path: {file_path}."
+        )
+        super().__init__(message)
+
+
+class DataMaskingConfigFileNotFoundException(Exception):
+    def __init__(self, file_path: str):
+        message = f"Data masking configuration file not found in path: {file_path}."
         super().__init__(message)
