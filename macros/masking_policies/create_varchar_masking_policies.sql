@@ -6,13 +6,13 @@
 
     {% set create_masking_policy_query %}
     CREATE MASKING POLICY {{masking_policy_name}}
-    WITH (_input varchar)
+    WITH (_input varchar(max))
     USING (MD5(_input));
     {% endset %}
 
     {% set create_unmasking_policy_query %}
     CREATE MASKING POLICY {{unmasking_policy_name}}
-    WITH (_input varchar)
+    WITH (_input varchar(max))
     USING (_input);
     {% endset %}
 
