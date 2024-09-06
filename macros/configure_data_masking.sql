@@ -8,7 +8,7 @@
     {% do create_project_related_masking_policies() %}
     {% set objects_in_database = get_objects_in_database() %}
     {% set database_identities = get_database_identities() %}
-    {% set currently_applied_masking_configs = get_masking_configs_in_database() %}
+    {% set currently_applied_masking_configs = get_currently_applied_masking_configs_for_objects_from_new_config(temp_data_masking_config_table_name) %}
     {% set new_masking_configs = get_new_masking_configs(temp_data_masking_config_table_name, objects_in_database) %}
     {% set new_masking_configs_in_format_of_system_table = map_new_configs_to_system_table_format(new_masking_configs) %}
     {% set policies_to_detach = get_policies_to_detach(currently_applied_masking_configs, new_masking_configs_in_format_of_system_table) %}
@@ -41,10 +41,24 @@
     {% do run_query(drop_temp_config_data_masking_table_query) %}
 {% endmacro %}
 
-{% macro get_masking_configs_in_database() %}
-    {% set query_system_table %}
-        select * from svv_attached_masking_policy;
+{% macro get_currently_applied_masking_configs_for_objects_from_new_config(temp_data_masking_config_table_name) %}
+    {% set query_temp_config_table %}
+        select schema_name, model_name from access_management.{{temp_data_masking_config_table_name}};
     {% endset %}
+
+    {% set query_temp_config_table_result = dbt.run_query(query_temp_config_table) %}
+    {% set temp_config_schema_table_conditions = [] %}
+
+    {% for row in query_temp_config_table_result.rows %}
+        {% do temp_config_schema_table_conditions.append(row.schema_name ~ '.' ~ row.model_name) %}
+    {% endfor %}
+
+    {% set query_system_table %}
+        select * from svv_attached_masking_policy
+        where
+        (schema_name || '.' || table_name) in ({{ "'" ~ temp_config_schema_table_conditions | unique | join("', '") ~ "'" }});
+    {% endset %}
+
     {% set query_system_table_result = dbt.run_query(query_system_table) %}
     {% set masking_configs = [] %}
 
