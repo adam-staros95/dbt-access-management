@@ -41,9 +41,12 @@
                         {%- endfor -%}
                     {%- endfor -%}
                 {%- endset %}
-
-                {{ log(configure_masking_query, info=True) }}
-                {% do dbt.run_query(configure_masking_query) %}
+                {% if configure_masking_query %}
+                    {{ log(configure_masking_query, info=True) }}
+                    {% do dbt.run_query(configure_masking_query) %}
+                {% else %}
+                     {{ log("No masking configured for " ~ this.schema ~ "." ~ this.name, info=True) }}
+                {% endif %}
             {% else %}
                 {{ log("Applying masking policies for incremental runs is not currently supported!", info=True) }}
             {% endif %}
