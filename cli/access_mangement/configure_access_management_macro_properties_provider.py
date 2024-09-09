@@ -104,6 +104,7 @@ def get_configure_access_management_macro_properties(
         sql_engine,
         database_name,
     )
+    print(access_management_rows)
 
     temp_access_management_config_table_name = (
         f"temp_{project_name}_{int(time.time())}_access_management_config"

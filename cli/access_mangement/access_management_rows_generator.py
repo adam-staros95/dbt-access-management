@@ -42,7 +42,7 @@ def generate_access_management_rows(
             revokes_per_node = set()
 
             sorted_config_paths = sorted(
-                identity.config_paths, key=lambda x: x[0].count("/"), reverse=True
+                identity.model_path_access_configs, key=lambda x : x.model_path.count("/"), reverse=True
             )
 
             for path, access_level in sorted_config_paths:
