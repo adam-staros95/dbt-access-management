@@ -1,6 +1,9 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
-        {% if config.get('materialized') in ['table', 'view'] %}
+        {% if config.get('materialized') == 'ephemeral' %}
+             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
+        {% elif config.get('materialized') in ['table', 'view'] or ('incremental' in config.get('materialized') and flags.FULL_REFRESH)
+            or (config.get('materialized') == 'seed' and flags.FULL_REFRESH) %}
             {% set database_identities = dbt_access_management.get_database_identities() %}
             {% set users_identities = dbt_access_management.get_users(database_identities) %}
             {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
@@ -46,7 +49,7 @@
                  {{ log("No masking configured for " ~ this.schema ~ "." ~ this.name, info=True) }}
             {% endif %}
         {% else %}
-            {{ log("Skipping assigning masking policies for not table or view model", info=False) }}
+            {{ log("Skipping assigning masking policies for incremental run", info=False) }}
         {% endif %}
     {% endif %}
 {% endmacro %}
