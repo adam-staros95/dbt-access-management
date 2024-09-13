@@ -21,7 +21,7 @@
         {% set table_column_types = get_table_column_types(policies_to_attach) %}
         {% set attach_policies_query = get_attach_policies_query(policies_to_attach, table_column_types) %}
     {% endif %}
-    {% if (policies_to_detach | length) > 0 or (policies_to_attach | length) > 0 %}
+    {% if detach_policies_query | trim | length > 0 or attach_policies_query | trim | length > 0 %}
         {% set configuration_query %}
             -- Detach masking policies
             {{detach_policies_query}}
@@ -275,8 +275,8 @@
     {%- endset -%}
 
     {% if issues | length > 0 %}
-        {% set issue_message = "You configured data masking for following columns which don't exist:\n" ~ issues | unique | join(', ') %}
-        {{ exceptions.raise_compiler_error(issue_message) }}
+        {% set issue_message = "You configured data masking for following columns which don't exist yet:\n" ~ issues | unique | join(', ') %}
+        {{ log(issue_message, info=True) }}
     {% endif %}
 
     {% do return(configure_masking_query) %}
