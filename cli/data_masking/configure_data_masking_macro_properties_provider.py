@@ -16,6 +16,7 @@ def _build_create_data_masking_config_table_sql(
     rows: List[DataMaskingRow], table_name: str, project_name: str
 ) -> str:
     create_table_sql = f"""
+BEGIN;
 CREATE SCHEMA IF NOT EXISTS access_management;
 DROP TABLE IF EXISTS access_management.{table_name};
 CREATE TABLE access_management.{table_name} (
@@ -49,6 +50,8 @@ CREATE TABLE access_management.{table_name} (
             values.append(value)
 
         create_table_sql += ",\n".join(values) + ";"
+    create_table_sql += "\nCOMMIT;"
+
     return create_table_sql
 
 
