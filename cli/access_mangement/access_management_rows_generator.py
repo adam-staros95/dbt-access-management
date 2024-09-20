@@ -38,14 +38,15 @@ def generate_access_management_rows(
 
     for node in manifest_nodes:
         for identity in data_base_access_config.access_config_identities:
+            for model_path_access_configs in identity.model_path_access_configs
             grants_per_node = set()
             revokes_per_node = set()
 
-            sorted_config_paths = sorted(
-                identity.model_path_access_configs, key=lambda x : x.model_path.count("/"), reverse=True
+            sorted_model_path_access_configs = sorted(
+                identity.model_path_access_configs, key=lambda x: x.model_path.count("/"), reverse=True
             )
 
-            for path, access_level in sorted_config_paths:
+            for path, access_level in sorted_model_path_access_configs:
                 if node.model_type == ModelType.MODEL:
                     if f"/{node.path.replace('.sql', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
