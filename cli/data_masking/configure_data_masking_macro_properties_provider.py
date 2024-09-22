@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from typing import List
 
 from cli.data_masking.data_masking_config_file_parser import (
@@ -15,24 +16,25 @@ from cli.model import ConfigureMacroProperties, ManifestNode
 def _build_create_data_masking_config_table_sql(
     rows: List[DataMaskingRow], table_name: str, project_name: str
 ) -> str:
+    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     create_table_sql = f"""
 BEGIN;
 CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.{table_name};
-CREATE TABLE access_management.{table_name} (
+CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
         model_name TEXT,
         materialization TEXT,
-        masking_config SUPER
+        masking_config SUPER,
+        created_timestamp TIMESTAMP
     );
     """
 
     if rows:
         create_table_sql += f"""
         INSERT INTO access_management.{table_name}
-        (project_name, database_name, schema_name, model_name, materialization, masking_config)
+        (project_name, database_name, schema_name, model_name, materialization, masking_config, created_timestamp)
         VALUES
         """
 
@@ -45,11 +47,16 @@ CREATE TABLE access_management.{table_name} (
                 f"'{row.schema_name}', "
                 f"'{row.model_name}', "
                 f"'{row.materialization}', "
-                f"JSON_PARSE('{masking_config}'))"
+                f"JSON_PARSE('{masking_config}'), "
+                f"TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS'))"
             )
             values.append(value)
 
         create_table_sql += ",\n".join(values) + ";"
+    create_table_sql += (
+        f"DELETE FROM access_management.{table_name} "
+        f"WHERE created_timestamp < TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS');"
+    )
     create_table_sql += "\nCOMMIT;"
 
     return create_table_sql

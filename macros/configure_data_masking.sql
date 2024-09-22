@@ -31,12 +31,17 @@
         {{ log("Configure masking policies query: \n" ~ configuration_query, info=True) }}
         {% do run_query(configuration_query) %}
     {% endif %}
-
+    {% set should_drop_configuration_table = check_should_drop_configuration_table('access_management', temp_data_masking_config_table_name, config_data_masking_table_name) %}
+    {% if should_drop_configuration_table %}
+        {% set drop_configuration_table_query %}
+            DROP TABLE access_management.{{config_data_masking_table_name}};
+        {% endset %}
+        {% do run_query(drop_configuration_table_query) %}
+    {% endif %}
+    {% do run_query(create_data_masking_config_table_query) %}
     {% set drop_temp_config_data_masking_table_query %}
         DROP TABLE access_management.{{temp_data_masking_config_table_name}};
     {% endset %}
-
-    {% do run_query(create_data_masking_config_table_query) %}
     {{ log(drop_temp_config_data_masking_table_query, info=True) }}
     {% do run_query(drop_temp_config_data_masking_table_query) %}
 {% endmacro %}

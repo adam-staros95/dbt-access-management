@@ -16,7 +16,8 @@
             FROM access_management.{{project_name}}_access_management_config
             WHERE schema_name = '{{ this.schema }}'
             AND model_name = '{{ this.name }}'
-            AND (identity_type, identity_name) IN ({{ identities_in_clause }});
+            AND (identity_type, identity_name) IN ({{ identities_in_clause }})
+            AND created_timestamp = (SELECT MAX(created_timestamp) FROM access_management.{{project_name}}_access_management_config);
                 {% endset %}
 
                 {% set query_config_table_result = dbt.run_query(query_config_table) %}
