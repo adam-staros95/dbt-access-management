@@ -33,12 +33,12 @@
         {% endset %}
         {% do run_query(drop_configuration_table_query) %}
     {% endif %}
-    {% set drop_temp_config_table_query %}
+    {% do run_query(create_access_management_config_table_query) %}
+    {% set drop_temp_config_access_management_table_query %}
         DROP TABLE access_management.{{temp_access_management_config_table_name}};
     {% endset %}
-    {% do run_query(create_access_management_config_table_query) %}
-    {{ log(drop_temp_config_table_query, info=True) }}
-    {% do run_query(drop_temp_config_table_query) %}
+    {{ log(drop_temp_config_access_management_table_query, info=True) }}
+    {% do run_query(drop_temp_config_access_management_table_query) %}
 
 {% endmacro %}
 
