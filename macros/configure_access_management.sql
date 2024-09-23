@@ -26,12 +26,19 @@
     {% else %} {{ log("No grants or revokes to execute", info=True) }}
     {% endif %}
 
-    {% set drop_temp_config_table_query %}
+    {% set should_drop_configuration_table = check_should_drop_configuration_table('access_management', temp_access_management_config_table_name, config_access_management_table_name) %}
+    {% if should_drop_configuration_table %}
+        {% set drop_configuration_table_query %}
+            DROP TABLE access_management.{{config_access_management_table_name}};
+        {% endset %}
+        {% do run_query(drop_configuration_table_query) %}
+    {% endif %}
+    {% do run_query(create_access_management_config_table_query) %}
+    {% set drop_temp_config_access_management_table_query %}
         DROP TABLE access_management.{{temp_access_management_config_table_name}};
     {% endset %}
-    {% do run_query(create_access_management_config_table_query) %}
-    {{ log(drop_temp_config_table_query, info=True) }}
-    {% do run_query(drop_temp_config_table_query) %}
+    {{ log(drop_temp_config_access_management_table_query, info=True) }}
+    {% do run_query(drop_temp_config_access_management_table_query) %}
 
 {% endmacro %}
 

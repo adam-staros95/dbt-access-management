@@ -256,7 +256,9 @@ def configure(
         manifest, project_name
     )
     database_name = _get_database_name(manifest_nodes, database_name)
-    click.echo(f"Running dbt-access-management configurations on {database_name} database...")
+    click.echo(
+        f"Running dbt-access-management configurations on {database_name} database..."
+    )
 
     configure_access_management_macro_properties = (
         (

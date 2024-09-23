@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from typing import List
 
 from cli.access_mangement.access_management_config_file_parser import (
@@ -35,10 +36,11 @@ def _get_access_management_rows(
 def _build_create_access_management_config_table_sql(
     rows: List[AccessManagementRow], table_name: str
 ) -> str:
+    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     create_table_sql = f"""
+BEGIN;
 CREATE SCHEMA IF NOT EXISTS access_management;
-DROP TABLE IF EXISTS access_management.{table_name};
-CREATE TABLE access_management.{table_name} (
+CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
@@ -47,13 +49,14 @@ CREATE TABLE access_management.{table_name} (
         identity_type TEXT,
         identity_name TEXT,
         grants SUPER,
-        revokes SUPER
+        revokes SUPER,
+        created_timestamp TIMESTAMP
     );
     """
     if rows:
         create_table_sql += f"""
         INSERT INTO access_management.{table_name}
-        (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes)
+        (project_name, database_name, schema_name, model_name, materialization, identity_type, identity_name, grants, revokes, created_timestamp)
         VALUES
         """
 
@@ -70,11 +73,19 @@ CREATE TABLE access_management.{table_name} (
                 f"'{row.identity_type}', "
                 f"'{row.identity_name}', "
                 f"'{grants}', "
-                f"'{revokes}')"
+                f"'{revokes}', "
+                f"TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS'))"
             )
             values.append(value)
 
         create_table_sql += ",\n".join(values) + ";"
+
+    create_table_sql += (
+        f"DELETE FROM access_management.{table_name} "
+        f"WHERE created_timestamp < TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS');"
+    )
+    create_table_sql += "\nCOMMIT;"
+
     return create_table_sql
 
 

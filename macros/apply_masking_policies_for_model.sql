@@ -1,7 +1,7 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
         {% if config.get('materialized') == 'ephemeral' %}
-             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
+            {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
         {% elif config.get('materialized') in ['table', 'view'] or ('incremental' in config.get('materialized') and flags.FULL_REFRESH)
             or (config.get('materialized') == 'seed' and flags.FULL_REFRESH) %}
             {% set database_identities = dbt_access_management.get_database_identities() %}
@@ -46,7 +46,7 @@
                 {{ log(configure_masking_query, info=True) }}
                 {% do dbt.run_query(configure_masking_query) %}
             {% else %}
-                 {{ log("No masking configured for " ~ this.schema ~ "." ~ this.name, info=True) }}
+                {{ log("No masking configured for " ~ this.schema ~ "." ~ this.name, info=True) }}
             {% endif %}
         {% else %}
             {{ log("Skipping assigning masking policies for incremental run", info=False) }}
@@ -57,7 +57,8 @@
 {% macro get_masking_configs_for_model() %}
     {% set query_config_table %}
         select c.column_name, c.users_with_access, c.roles_with_access from access_management.{{project_name}}_data_masking_config  as t, t.masking_config as c
-        where schema_name = '{{ this.schema }}' and model_name = '{{ this.name }}';
+        where schema_name = '{{ this.schema }}' and model_name = '{{ this.name }}'
+        and created_timestamp = (select max(created_timestamp) from access_management.{{project_name}}_data_masking_config);
     {% endset %}
 
     {% set query_config_table_result = dbt.run_query(query_config_table) %}
