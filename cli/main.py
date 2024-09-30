@@ -1,7 +1,7 @@
 import json
 import os
 import shlex
-from typing import List
+from typing import List, Optional
 
 import click
 from dbt.cli.main import dbtRunner
@@ -26,6 +26,34 @@ except ModuleNotFoundError:
     from dbt.node_types import NodeType
 
 dbt = dbtRunner()
+
+
+def _get_command_list(dbt_command: str) -> List[str]:
+    return list(
+        filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
+    )
+
+
+def _get_variables(command_list: List[str]) -> Optional[str]:
+    return next(
+        (
+            command_list[i + 1]
+            for i in range(len(command_list) - 1)
+            if command_list[i] == "--vars"
+        ),
+        None,
+    )
+
+
+def _get_target(command_list: List[str]) -> Optional[str]:
+    return next(
+        (
+            command_list[i + 1]
+            for i in range(len(command_list) - 1)
+            if command_list[i] == "--target"
+        ),
+        None,
+    )
 
 
 def _get_manifest_nodes_eligible_for_configuration(
@@ -77,26 +105,8 @@ def _get_database_name(manifest_nodes: List[ManifestNode], database_name: str = 
     return database_name if database_name else list(db_name_from_manifest_file)[0]
 
 
-def _invoke_compile_command(command_list: List[str]) -> None:
+def _invoke_compile_command(target: str = None, variables: str = None) -> None:
     click.echo("Compiling project...")
-
-    target = next(
-        (
-            command_list[i + 1]
-            for i in range(len(command_list) - 1)
-            if command_list[i] == "--target"
-        ),
-        None,
-    )
-    variables = next(
-        (
-            command_list[i + 1]
-            for i in range(len(command_list) - 1)
-            if command_list[i] == "--vars"
-        ),
-        None,
-    )
-
     cmd = ["compile"]
     if target:
         cmd.extend(["--target", target])
@@ -117,6 +127,8 @@ def load_manifest(manifest_path: str = "target/manifest.json") -> Manifest:
 def run_configure_macro(
     configure_access_management_macro_properties: ConfigureMacroProperties = None,
     configure_data_masking_macro_properties: ConfigureMacroProperties = None,
+    target: str = None,
+    variables: str = None,
 ) -> None:
     def prepare_access_management_args(
         configure_properties: ConfigureMacroProperties,
@@ -139,14 +151,17 @@ def run_configure_macro(
         }
 
     def run_dbt_operation(operation_name: str, args: dict) -> None:
-        res = dbt.invoke(
-            [
-                "run-operation",
-                operation_name,
-                "--args",
-                json.dumps(args),
-            ]
-        )
+        cmd = [
+            "run-operation",
+            operation_name,
+            "--args",
+            json.dumps(args),
+        ]
+        if target:
+            cmd.extend(["--target", target])
+        if variables:
+            cmd.extend(["--vars", variables])
+        res = dbt.invoke(cmd)
         if not res.success:
             exit(1)
 
@@ -241,10 +256,11 @@ def configure(
     data_masking_config_file_path: str,
     database_name: str = None,
 ):
-    command_list = list(
-        filter(lambda c: c.lower() != "dbt", shlex.split(" ".join(dbt_command.split())))
-    )
-    _invoke_compile_command(command_list)
+    command_list = _get_command_list(dbt_command)
+    target = _get_target(command_list)
+    variables = _get_variables(command_list)
+
+    _invoke_compile_command(target, variables)
 
     manifest = load_manifest()
     project_name = manifest.metadata.project_name
@@ -289,6 +305,8 @@ def configure(
     run_configure_macro(
         configure_access_management_macro_properties=configure_access_management_macro_properties,
         configure_data_masking_macro_properties=configure_data_masking_macro_properties,
+        target=target,
+        variables=variables,
     )
 
     _invoke_passed_dbt_command(command_list)
