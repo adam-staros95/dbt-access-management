@@ -56,9 +56,11 @@
 
 {% macro get_masking_configs_for_model() %}
     {% set query_config_table %}
+        begin;
         select c.column_name, c.users_with_access, c.roles_with_access from access_management.{{project_name}}_data_masking_config  as t, t.masking_config as c
         where schema_name = '{{ this.schema }}' and model_name = '{{ this.name }}'
         and created_timestamp = (select max(created_timestamp) from access_management.{{project_name}}_data_masking_config);
+        commit;
     {% endset %}
 
     {% set query_config_table_result = dbt.run_query(query_config_table) %}
