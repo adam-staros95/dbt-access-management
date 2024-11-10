@@ -1,6 +1,7 @@
-# Access Management Library for dbt Models
+# DBT Access Management
 
-This library is designed to manage access control for dbt models in Redshift. It provides a robust solution for configuring, validating, and applying grants and revokes to users, roles, and groups based on an access management YAML file and dbt's `manifest.json`. The library is intended for use in CI/CD pipelines and as dbt macros, ensuring that database permissions are always in sync with your dbt models.
+`dbt-access-management` is tool designed to manage access control and data masking in your dbt projects. 
+Currently, only working with AWS Redshift.
 
 ## Table of Contents
 
@@ -8,176 +9,157 @@ This library is designed to manage access control for dbt models in Redshift. It
 2. [Installation](#installation)
 3. [Configuration](#configuration)
 4. [Usage](#usage)
-    - [CI/CD Pipeline Integration](#cicd-pipeline-integration)
-    - [dbt Macros](#dbt-macros)
-5. [Access Management Workflow](#access-management-workflow)
-6. [Example](#example)
-7. [Development](#development)
-8. [Contributing](#contributing)
-9. [License](#license)
+5. [Engineering backlog](#engineering backlog)
 
 ## Overview
 
-The Access Management Library consists of two main components:
+`dbt-access-management` tool works in two stages:
 
-1. **Python Code**: This is used to configure the access control table in Redshift, validate user/role/group definitions, and execute the necessary revoke and grant statements.
-2. **dbt Macros**: These macros are used as post-hooks in dbt models to dynamically apply grants based on the access configuration.
+1. Validating and running desired security configuration changes and building configuration tables under `access_management` schema. 
+This stage is intended to use in cicd pipelines but can be also utilized by data admins to make ad-hoc security changes
+2. Running dbt macros in post-hooks to keep security state in desired place after running dbt models. 
+This stage reads configuration tables made in first stage to apply grants and data masking.
 
-This library helps ensure that your database permissions are always aligned with the models defined in dbt, providing a streamlined way to manage access control in data environments.
+[//]: # (TODO: add diagram)
 
 ---
 
 ## Installation
 
-### Python Library
+Tool is intended to be easy to use, so only required prerequisite is to have Python and DBT installed. Please always
+install library with the newest tag. List of all available tags is available here: `https://github.com/adam-staros95/dbt-access-management/tags`
 
-To install the Python library, you can use `pip`:
+### CLI
+
+To install the CLI just execute following command:
 
 ```bash
-pip install your-library-name
+pip install git+https://github.com/adam-staros95/dbt-access-management.git@<tag>
 ```
 
-### dbt Macros
+### DBT macros
 
-Ensure that your dbt project is set up correctly, and include the macros provided by this library in your project.
+To install DBT macros add following package to the `packages.yml` file:
+```yaml
+packages:
+  - git: https://github.com/adam-staros95/dbt-access-management.git
+    revision: <tag>
+```
+and execute `dbt deps` command.
 
 ---
 
 ## Configuration
 
-### Access Management YAML
+To configure library add following post-hooks under your `models` and `seeds` section of your `dbt_project.yml` file:
+```yaml
+models:
+  jaffle_shop:
+     +post-hook:
+      - {{ dbt_access_management.execute_grants_for_model() }}
+      - {{ dbt_access_management.apply_masking_policies_for_model() }}
+seeds:
+  jaffle_shop:
+     +post-hook:
+      - {{ dbt_access_management.execute_grants_for_model() }}
+      - {{ dbt_access_management.apply_masking_policies_for_model() }}
+```
 
-The library relies on an `access_management.yaml` file that defines the access levels for different users, roles, and groups across your dbt models.
+Next, create `access_management.yml` and `data_masking.yml` files in your project. 
+By default, files should be created under same directory as your `dbt_project.yml` file.
 
-#### Sample `access_management.yaml`
+### `access_management.yml` file
+
+The tool relies on an `access_management.yaml` file that defines the access levels for different users, roles, and groups across your dbt models.
+If you support multiple environments on multiple databases in your DBT project you can list them in one configuration file.
+
+#### Sample file
 
 ```yaml
 databases:
-  jaffle_shop:
+  jaffle_shop_dev:
     users:
-      user_1:
+      tom:
         +access_level: read
         staging:
           +access_level: write
-          some_db_1:
-            some_model_a:
+          hr:
+            employees:
               access_level: read_write
-          some_db_2:
+          finance:
             +access_level: read_write
-      user_3:
-        +access_level: read
-        staging:
-          some_db_2:
-            some_model_d:
-              +access_level: read_write
-  test:
+    groups:
+      legal:
+        +access_level: read_write
+  jaffle_shop_test:
     users:
-      user_2:
+      jane:
         staging:
-          some_db_2:
-            some_model_d:
+          hr:
+            payroll:
               +access_level: read
     roles:
-      some_role:
-        +access_level: read_write
+      marketing:
+        +access_level: read
+  jaffle_shop_prod:
+    roles:
+      admins:
+        +access_level: all
 ```
 
-### Redshift Config Table
+Notes:
+- `jaffle_shop_dev`, `jaffle_shop_test` and `jaffle_shop_prod` are databases in which dbt models are created.
+- entity names (under `users`, `roles` and `groups` sections) are case-sensitive.
 
-The library requires a configuration table in Redshift, which stores the current access levels. This table should have the following structure:
+Tool supports following access levels:
+- `read`
+- `write`
+- `read_write`
+- `all`
 
-```sql
-CREATE TABLE access_management.config_table (
-    project_name TEXT,
-    database_name TEXT,
-    schema_name TEXT,
-    model_name TEXT,
-    materialization TEXT,
-    entity_type TEXT,
-    entity_name TEXT,
-    grants SUPER,
-    revokes SUPER
-);
+and more specific access level overwrites less specific one.
+
+### `data_masking.yml` file
+
+The tool uses `data_masking.yaml` to attach dynamic data masking policies to your dbt models. 
+
+#### Sample file
+
+```yaml
+configuration:
+  - employees:
+      columns:
+        - first_name:
+            roles_with_access:
+              - hr_role
+              - oauth_aad:HR_TEAM
+        - last_name:
+            roles_with_access:
+              - hr_role
+              - oauth_aad:HR_TEAM
+  - clients:
+      columns:
+        - email:
+            roles_with_access:
+              - marketing
+            users_with_access:
+               - jane
+               - tom
 ```
+Notes:
+- `employees` and `clients` are dbt_models.
+- entity names (under `roles_with_access` and `users_with_access` sections) are case-sensitive.
+- only configured entities will be able to read data stored in configured columns 
 
 ---
 
 ## Usage
 
-### CLI
+[//]: # (TODO)
 
-The Python code can be integrated into your CI/CD pipeline to automate the management of access control in Redshift. Here’s an example of how to use the library in your CI/CD pipeline:
-
-1. **Configure the Temp Config Table**: The pipeline should run a script that reads the `access_management.yaml` and `manifest.json`, then populates a temporary configuration table.
-  
-2. **Validate Users, Roles, and Groups**: Ensure that all entities defined in the YAML file exist in Redshift.
-
-3. **Apply Grants and Revokes**: Execute the generated SQL statements to revoke outdated permissions and apply the new ones.
-
-```python
-from your_library import AccessManager
-
-access_manager = AccessManager(
-    yaml_file="access_management.yaml",
-    manifest_file="manifest.json",
-    redshift_conn=your_redshift_connection
-)
-
-access_manager.validate_entities()
-access_manager.update_config_table()
-access_manager.apply_grants_and_revokes()
-```
-
-### dbt Macros
-
-The library provides dbt macros that should be used as post-hooks on your dbt models. These macros read the configuration for each model and apply the necessary grants.
-
-#### Example Macro Usage in dbt
-
-In your dbt model:
-
-```sql
-{{ config(
-    post_hook="{{ your_library.apply_grants('your_model_name') }}"
-) }}
-
-SELECT * FROM your_table;
-```
-
-This macro will automatically apply the grants configured for `your_model_name` after the model is run.
-
-## Access Management Workflow
-
-1. **Define Access Levels**: In `access_management.yaml`, define the access levels for each user, role, and group across your databases and models.
-
-2. **Run the Python Script**: As part of your CI/CD pipeline, run the script to validate entities, populate the temp config table, and apply grants/revokes.
-
-3. **Execute dbt Models**: When dbt models are run, the post-hook macros will apply the appropriate grants based on the access configuration.
-
-4. **Audit and Review**: Regularly review the grants and revokes to ensure they meet your organization’s security policies.
-
----
-
-
-## Example
-
-Here is a complete example of using the library in a CI/CD pipeline and in a dbt model:
-
-1. **CI/CD Pipeline Script**:
-
-    ```python
-    from your_library import AccessManager
-
-    access_manager = AccessManager(
-        yaml_file="access_management.yaml",
-        manifest_file="manifest.json",
-        redshift_conn=your_redshift_connection
-    )
-
-    access_manager.validate_entities()
-    access_manager.update_config_table()
-    access_manager.apply_grants_and_revokes()
-    ```
-
-2. **dbt Model Example**:
-ADME.
+## Engineering backlog
+- Adding support for snapshot models
+- Adding support for column level security
+- Adding support for row level security 
+- Reading database system tables to keep privileges configuration in desired state to avoid situation where privileges are configured outside `dbt-access-management`
+- Renaming `access_management.yml` file to `privileges.yml` file and respective configuration tables names
