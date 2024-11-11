@@ -20,7 +20,9 @@ This stage is intended to use in cicd pipelines but can be also utilized by data
 2. Running dbt macros in post-hooks to keep security state in desired place after running dbt models. 
 This stage reads configuration tables made in first stage to apply grants and data masking.
 
-[//]: # (TODO: add diagram)
+### Sample diagram
+
+![dbt-access-management](images/dbt-access-management.png)
 
 ---
 
@@ -163,3 +165,4 @@ Notes:
 - Adding support for row level security 
 - Reading database system tables to keep privileges configuration in desired state to avoid situation where privileges are configured outside `dbt-access-management`
 - Renaming `access_management.yml` file to `privileges.yml` file and respective configuration tables names
+
