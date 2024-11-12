@@ -10,6 +10,8 @@ Currently, only working with AWS Redshift.
 3. [Configuration](#configuration)
 4. [Usage](#usage)
 5. [Engineering backlog](#engineering backlog)
+6. [Known issues](#known issues)
+7. [Contact](#contact)
 
 ## Overview
 
@@ -157,12 +159,53 @@ Notes:
 
 ## Usage
 
-[//]: # (TODO)
+Once you configure dbt-access-management, you are ready to configure security in your dbt project.
+To do this from your dbt project directory execute command:
+```bash
+dbt-am configure --dbt-command "<your_dbt_command>"
+```
+
+for example:
+```bash
+dbt-am configure --dbt-command "dbt run"
+```
+
+This command will run `dbt compile` to get list of your dbt models and execute `dbt run-operation` 
+command to apply configured security changes, after that configuration tables will be created which will
+be used in post-hooks.
+
+`dbt-am configure` supports following options:
+
+- `--configure-access-management` - used with `False` flag gives possibility to disable privileges configurations.
+Useful if you want to attach data masking only.
+- `--configure-data-masking` - used with `False` flag gives possibility to disable data masking configurations.
+Useful if you want to attach privileges only.
+- `--access-management-config-file-path` - gives possibility to override default `access_management.yml` file location.
+Can be used to configure database privileges in multiple files depending on environment.
+- `--data-masking-config-file-path` - gives possibility to override default `data_masking.yml` file location.
+Can be used to configure data masking differently depending on environment.
+- `--database-name` - by default information about database name will be read from `manifest.json` file. However,
+if your project uses models defined in other projects and in different databases than your project, 
+you need provide database name explicitly (this should be name of database in which you want to create your models).    
 
 ## Engineering backlog
 - Adding support for snapshot models
 - Adding support for column level security
-- Adding support for row level security 
+- Adding support for row level security
+- Adding `--dryrun` option to check what sql commands will be executed without running them
+- Adding `--skup-compile` option to skip `dbt compile` step during `dbt-am configure`
 - Reading database system tables to keep privileges configuration in desired state to avoid situation where privileges are configured outside `dbt-access-management`
 - Renaming `access_management.yml` file to `privileges.yml` file and respective configuration tables names
 
+## Known issues
+- Sometimes when you execute `dbt-am configure` command during `dbt run` in different process, you may encounter 
+`ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`
+
+## Contact
+For question or feedback, please reach out through one of the following methods:
+
+[//]: # (TODO: Create mail)
+- **Email:** [dbt_access_management@gmail.com](mailto:dbt_access_management@gmail.com)
+- **GitHub Issues:** If you encounter bugs or have feature requests, please open an [issue here](https://github.com/adam-staros95/dbt-access-management/issues).
+
+Thank you for your interest in this project!
