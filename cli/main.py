@@ -1,6 +1,7 @@
 import json
 import os
 import shlex
+import time
 from typing import List, Optional
 
 import click
@@ -256,6 +257,7 @@ def configure(
     data_masking_config_file_path: str,
     database_name: str = None,
 ):
+    print(f"{int(time.time())}: Starting...")
     command_list = _get_command_list(dbt_command)
     target = _get_target(command_list)
     variables = _get_variables(command_list)

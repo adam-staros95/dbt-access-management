@@ -18,7 +18,6 @@ def _build_create_data_masking_config_table_sql(
 ) -> str:
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     create_table_sql = f"""
-BEGIN;
 CREATE SCHEMA IF NOT EXISTS access_management;
 CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         project_name TEXT,
@@ -29,6 +28,8 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         masking_config SUPER,
         created_timestamp TIMESTAMP
     );
+BEGIN;
+LOCK access_management.{table_name};
     """
 
     if rows:
