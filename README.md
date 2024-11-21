@@ -58,7 +58,6 @@ packages:
 ```
 And execute the `dbt deps` command.
 
-
 ---
 
 ## Configuration
@@ -196,20 +195,26 @@ Can be used to configure data masking differently depending on environment.
 if your project uses models defined in other projects and in different databases than your project, 
 you need provide database name in which you want to create your models explicitly.    
 
+---
+
 ## Engineering backlog
 - Add support for snapshot models.
 - Add support for column-level security.
 - Add support for row-level security.
+- Format code using tool like `SQLFluff` 
 - Implement a `--dryrun` option to display the SQL commands to be executed without actually running them.
 - Implement a `--skip-compile` option to bypass the `dbt compile` step during the `dbt-am configure` command.
 - Enhance the tool to read database system tables to maintain privilege configurations, ensuring consistency and avoiding external changes.
 - Rename the `access_management.yml` file to privileges.yml and update corresponding configuration table names.
 
+---
 
 ## Known caveats
-- In concurrent environments running `dbt-am configure` command during a `dbt run` in different process may result in following error:
+
+### Serializable isolation violation
+In concurrent environments running `dbt-am configure` command during a `dbt run` in different process may result in following error:
 ```text
-ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`. To solve this problem
+ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`.
 ```
 
 **Solution:**
