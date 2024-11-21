@@ -62,8 +62,9 @@ And execute the `dbt deps` command.
 
 ## Configuration
 
-To configure the library, add the following post-hooks under your `models` and `seeds` sections of your `dbt_project.yml` file:
+To configure the tool in your project go through following steps:
 
+## Update `dbt_project.yml` file 
 ```yaml
 models:
   jaffle_shop:
@@ -77,14 +78,16 @@ seeds:
       - {{ dbt_access_management.apply_masking_policies_for_model() }}
 ```
 
-Next, create `access_management.yml` and `data_masking.yml` files in your project.
-By default, these files should be located in the same directory as your dbt_project.yml file.
+If you don't want to configure database privileges, you can skip adding the `execute_grants_for_model` macro. 
+Similarly, if you don't want to configure data masking, you can skip adding the `apply_masking_policies_for_model` macro.
 
-### `access_management.yml` file
+### Create `access_management.yml` file
 
 This file defines the access levels for different users, roles, and groups across your dbt models.
 If your project supports multiple environments or databases, you can list them all in a single configuration file.
+By default, file should be created in the same directory as your dbt_project.yml file. 
 
+You can skip this step if you don't want to configure database privileges.
 #### Sample file
 
 ```yaml
@@ -129,11 +132,12 @@ Supported access levels:
 - `read_write`
 - `all`
 
-### `data_masking.yml` file
+### Create `data_masking.yml` file
 
 This file contains dynamic data masking policies configurations of your dbt models.
+By default, file should be created in the same directory as your dbt_project.yml file.
 
-
+You can skip this step if you don't want to configure data masking..
 #### Sample file
 
 ```yaml
@@ -165,7 +169,7 @@ Notes:
 
 ## Usage
 
-Once `dbt-access-management` is configured, you are ready to enforce security in your dbt project.
+Once `dbt-access-management` is configured, you are ready to configure security in your dbt project.
 
 Run the following command from your dbt project directory:
 ```bash
@@ -214,7 +218,7 @@ you need provide database name in which you want to create your models explicitl
 ### Serializable isolation violation
 In concurrent environments running `dbt-am configure` command during a `dbt run` in different process may result in following error:
 ```text
-ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`.
+ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift.
 ```
 
 **Solution:**
