@@ -64,7 +64,7 @@ And execute the `dbt deps` command.
 
 To configure the tool in your project go through following steps:
 
-## Update `dbt_project.yml` file 
+### Update `dbt_project.yml` file 
 ```yaml
 models:
   jaffle_shop:
