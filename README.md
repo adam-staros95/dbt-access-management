@@ -10,7 +10,7 @@ Currently, only working with AWS Redshift.
 3. [Configuration](#configuration)
 4. [Usage](#usage)
 5. [Engineering backlog](#engineering backlog)
-6. [Known issues](#known issues)
+6. [Known Caveats](#known caveats)
 7. [Contact](#contact)
 
 ## Overview
@@ -197,15 +197,8 @@ you need provide database name explicitly (this should be name of database in wh
 - Reading database system tables to keep privileges configuration in desired state to avoid situation where privileges are configured outside `dbt-access-management`
 - Renaming `access_management.yml` file to `privileges.yml` file and respective configuration tables names
 
-## Known issues
-- Sometimes when you execute `dbt-am configure` command during `dbt run` in different process, you may encounter 
-`ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`
+## Known caveats
+- Sometimes in concurrent environments when you execute `dbt-am configure` command during `dbt run` in different process, 
+you may encounter ERROR:1023 DETAIL: Serializable isolation violation on a table in Redshift`. To solve this problem
+you can update your database isolation level to snapshot: `ALTER DATABASE <db_name> ISOLATION LEVEL SNAPSHOT`
 
-## Contact
-For question or feedback, please reach out through one of the following methods:
-
-[//]: # (TODO: Create mail)
-- **Email:** [dbt_access_management@gmail.com](mailto:dbt_access_management@gmail.com)
-- **GitHub Issues:** If you encounter bugs or have feature requests, please open an [issue here](https://github.com/adam-staros95/dbt-access-management/issues).
-
-Thank you for your interest in this project!
