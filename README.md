@@ -10,8 +10,7 @@ Currently, it supports **AWS Redshift**.
 3. [Configuration](#configuration)  
 4. [Usage](#usage)  
 5. [Engineering Backlog](#engineering-backlog)  
-6. [Known Caveats](#known-caveats)  
-7. [Contact](#contact)  
+6. [Known Caveats](#known-caveats)   
 
 ---
 
