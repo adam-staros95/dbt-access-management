@@ -95,6 +95,23 @@ def _get_manifest_nodes_eligible_for_configuration(
                     else node.original_file_path.replace("\\", "/"),
                 )
             )
+
+        if (
+            unique_id.split(".")[0] == NodeType.Snapshot.value
+            and node.package_name == project_name
+        ):
+            result.append(
+                ManifestNode(
+                    database_name=node.database,
+                    model_type=ModelType.SNAPSHOT,
+                    model_name=node.name,
+                    schema_name=node.schema,
+                    materialization="table",
+                    path=node.original_file_path
+                    if os.name != "nt"
+                    else node.original_file_path.replace("\\", "/"),
+                )
+            )
     return result
 
 

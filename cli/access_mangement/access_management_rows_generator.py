@@ -46,7 +46,7 @@ def generate_access_management_rows(
             )
 
             for path, access_level in sorted_config_paths:
-                if node.model_type == ModelType.MODEL:
+                if node.model_type == ModelType.MODEL or node.model_type == ModelType.SNAPSHOT:
                     if f"/{node.path.replace('.sql', '/')}".startswith(path):
                         grants_per_node = _get_grant_statements(
                             access_level, identity, node
