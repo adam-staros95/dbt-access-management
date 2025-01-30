@@ -6,8 +6,8 @@
                     SELECT EXISTS (
                     SELECT table_name
                     FROM SVV_ATTACHED_MASKING_POLICY
-                    WHERE schema_name = {{ this.schema }}
-                    AND table_name = {{ this.name }}
+                     WHERE schema_name = '{{ this.schema }}'
+                    AND table_name = '{{ this.name }}'
                 );
             {%- endset %}
 
