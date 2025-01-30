@@ -1,9 +1,28 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
+
+        {% if config.get('materialized') == 'snapshot' %}
+            {% set has_policies_attached_query -%}
+                    SELECT EXISTS (
+                    SELECT table_name
+                    FROM SVV_ATTACHED_MASKING_POLICY
+                    WHERE schema_name = {{ this.schema }}
+                    AND table_name = {{ this.name }}
+                );
+            {%- endset %}
+
+            {% set has_policies_attached_query_results = dbt.run_query(has_policies_attached_query) %}
+            {% set snapshot_table_policies_existed_before_run = has_policies_attached_query_results.rows[0][0] %}
+
+        {% endif %}
+
         {% if config.get('materialized') == 'ephemeral' %}
             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
+        {% elif snapshot_table_policies_existed_before_run %}
+            {{ log("Skipping attaching masking policies for " ~ this.name ~ " existing snapshot table", info=True) }}
         {% elif config.get('materialized') in ['table', 'view'] or ('incremental' in config.get('materialized') and flags.FULL_REFRESH)
-            or (config.get('materialized') == 'seed' and flags.FULL_REFRESH) %}
+            or (config.get('materialized') == 'seed' and flags.FULL_REFRESH)
+            or (config.get('materialized') == 'snapshot' and snapshot_table_policies_existed_before_run == false) %}
             {% set database_identities = dbt_access_management.get_database_identities() %}
             {% set users_identities = dbt_access_management.get_users(database_identities) %}
             {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
