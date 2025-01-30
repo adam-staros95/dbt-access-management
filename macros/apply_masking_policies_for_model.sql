@@ -6,7 +6,7 @@
                     SELECT EXISTS (
                     SELECT table_name
                     FROM SVV_ATTACHED_MASKING_POLICY
-                     WHERE schema_name = '{{ this.schema }}'
+                    WHERE schema_name = '{{ this.schema }}'
                     AND table_name = '{{ this.name }}'
                 );
             {%- endset %}
@@ -27,12 +27,11 @@
             {% set users_identities = dbt_access_management.get_users(database_identities) %}
             {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
             {% set masking_configs =  dbt_access_management.get_masking_configs_for_model() %}
-
             {% set columns = adapter.get_columns_in_relation(this) %}
-
             {% set configure_masking_query -%}
                 {%- for masking_config in masking_configs -%}
                     {%- for col in columns -%}
+                    {{ log(masking_config['column_name'], info=True) }}
                         {%- if col.quoted == masking_config['column_name'] -%}
                             {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(col.name, col.data_type) %}
                             {%- if masking_policies['masking_policy'] is not none and masking_policies['unmasking_policy'] is not none -%}
