@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
                 f"'{row.schema_name}', "
                 f"'{row.model_name}', "
                 f"'{row.materialization}', "
-                f"'{row.identity_type}', "
+                f"'{row.identity_type.value}', "
                 f"'{row.identity_name}', "
                 f"'{grants}', "
                 f"'{revokes}', "
