@@ -31,7 +31,6 @@
             {% set configure_masking_query -%}
                 {%- for masking_config in masking_configs -%}
                     {%- for col in columns -%}
-                    {{ log(masking_config['column_name'], info=True) }}
                         {%- if col.quoted == masking_config['column_name'] -%}
                             {% set masking_policies = dbt_access_management.get_masking_policy_for_data_type(col.name, col.data_type) %}
                             {%- if masking_policies['masking_policy'] is not none and masking_policies['unmasking_policy'] is not none -%}
