@@ -106,7 +106,7 @@ def _get_manifest_nodes_eligible_for_configuration(
                     model_type=ModelType.SNAPSHOT,
                     model_name=node.name,
                     schema_name=node.schema,
-                    materialization="table",
+                    materialization=node.config.materialized,
                     path=node.original_file_path
                     if os.name != "nt"
                     else node.original_file_path.replace("\\", "/"),
