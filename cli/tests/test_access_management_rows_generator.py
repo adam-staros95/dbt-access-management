@@ -1,10 +1,10 @@
-from cli.access_management_config_file_parser import (
+from cli.access_mangement.access_management_config_file_parser import (
     AccessConfigIdentity,
     IdentityType,
     AccessLevel,
     DataBaseAccessConfig,
 )
-from cli.access_management_rows_generator import (
+from cli.access_mangement.access_management_rows_generator import (
     AccessManagementRow,
     generate_access_management_rows,
 )
@@ -86,10 +86,10 @@ def test_generate_access_management_rows_simple_case_one_user():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT SELECT ON staging.user TO "user_1";',
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
+                'GRANT SELECT ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.user FROM \\"user_1\\";'},
         )
     ]
     result = generate_access_management_rows(
@@ -135,10 +135,10 @@ def test_generate_access_management_rows_simple_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT SELECT ON staging.user TO "user_1";',
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
+                'GRANT SELECT ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.user FROM \\"user_1\\";'},
         ),
         AccessManagementRow(
             project_name="my_project",
@@ -149,10 +149,10 @@ def test_generate_access_management_rows_simple_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_2",
             grants={
-                'GRANT SELECT ON staging.user TO "user_2";',
-                'GRANT USAGE ON SCHEMA staging TO "user_2";',
+                'GRANT SELECT ON staging.user TO \\"user_2\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_2\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "user_2";'},
+            revokes={'REVOKE SELECT ON staging.user FROM \\"user_2\\";'},
         ),
     ]
     result = generate_access_management_rows(
@@ -198,10 +198,10 @@ def test_generate_access_management_rows_simple_case_one_user_one_role():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
-                'GRANT SELECT ON staging.user TO "user_1";',
+                'GRANT SELECT ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.user FROM \\"user_1\\";'},
         ),
         AccessManagementRow(
             project_name="my_project",
@@ -212,10 +212,10 @@ def test_generate_access_management_rows_simple_case_one_user_one_role():
             identity_type=IdentityType.ROLE,
             identity_name="role_2",
             grants={
-                'GRANT SELECT ON staging.user TO "ROLE role_2";',
-                'GRANT USAGE ON SCHEMA staging TO "ROLE role_2";',
+                'GRANT USAGE ON SCHEMA staging TO ROLE \\"role_2\\";',
+                'GRANT SELECT ON staging.user TO ROLE \\"role_2\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "ROLE role_2";'},
+            revokes={'REVOKE SELECT ON staging.user FROM ROLE \\"role_2\\";'},
         ),
     ]
     result = generate_access_management_rows(
@@ -267,13 +267,13 @@ def test_generate_access_management_rows_extended_case_one_user():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
-                'GRANT INSERT ON staging.user TO "user_1";',
-                'GRANT UPDATE ON staging.user TO "user_1";',
+                'GRANT UPDATE ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
+                'GRANT INSERT ON staging.user TO \\"user_1\\";',
             },
             revokes={
-                'REVOKE UPDATE ON staging.user FROM "user_1";',
-                'REVOKE INSERT ON staging.user FROM "user_1";',
+                'REVOKE UPDATE ON staging.user FROM \\"user_1\\";',
+                'REVOKE INSERT ON staging.user FROM \\"user_1\\";',
             },
         ),
         AccessManagementRow(
@@ -285,10 +285,10 @@ def test_generate_access_management_rows_extended_case_one_user():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
-                'GRANT SELECT ON staging.employee TO "user_1";',
+                'GRANT SELECT ON staging.employee TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.employee FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.employee FROM \\"user_1\\";'},
         ),
     ]
     result = generate_access_management_rows(
@@ -340,13 +340,13 @@ def test_generate_access_management_rows_extended_case_one_user_exact_path():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT UPDATE ON staging.user TO "user_1";',
-                'GRANT INSERT ON staging.user TO "user_1";',
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
+                'GRANT UPDATE ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
+                'GRANT INSERT ON staging.user TO \\"user_1\\";',
             },
             revokes={
-                'REVOKE INSERT ON staging.user FROM "user_1";',
-                'REVOKE UPDATE ON staging.user FROM "user_1";',
+                'REVOKE UPDATE ON staging.user FROM \\"user_1\\";',
+                'REVOKE INSERT ON staging.user FROM \\"user_1\\";',
             },
         ),
         AccessManagementRow(
@@ -358,10 +358,10 @@ def test_generate_access_management_rows_extended_case_one_user_exact_path():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
-                'GRANT SELECT ON staging.employee TO "user_1";',
+                'GRANT SELECT ON staging.employee TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.employee FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.employee FROM \\"user_1\\";'},
         ),
     ]
     result = generate_access_management_rows(
@@ -418,13 +418,13 @@ def test_generate_access_management_rows_extended_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
-                'GRANT INSERT ON staging.user TO "user_1";',
-                'GRANT UPDATE ON staging.user TO "user_1";',
+                'GRANT INSERT ON staging.user TO \\"user_1\\";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
+                'GRANT UPDATE ON staging.user TO \\"user_1\\";',
             },
             revokes={
-                'REVOKE UPDATE ON staging.user FROM "user_1";',
-                'REVOKE INSERT ON staging.user FROM "user_1";',
+                'REVOKE UPDATE ON staging.user FROM \\"user_1\\";',
+                'REVOKE INSERT ON staging.user FROM \\"user_1\\";',
             },
         ),
         AccessManagementRow(
@@ -436,10 +436,10 @@ def test_generate_access_management_rows_extended_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_2",
             grants={
-                'GRANT SELECT ON staging.user TO "user_2";',
-                'GRANT USAGE ON SCHEMA staging TO "user_2";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_2\\";',
+                'GRANT SELECT ON staging.user TO \\"user_2\\";',
             },
-            revokes={'REVOKE SELECT ON staging.user FROM "user_2";'},
+            revokes={'REVOKE SELECT ON staging.user FROM \\"user_2\\";'},
         ),
         AccessManagementRow(
             project_name="my_project",
@@ -450,10 +450,10 @@ def test_generate_access_management_rows_extended_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_1",
             grants={
-                'GRANT SELECT ON staging.employee TO "user_1";',
-                'GRANT USAGE ON SCHEMA staging TO "user_1";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_1\\";',
+                'GRANT SELECT ON staging.employee TO \\"user_1\\";',
             },
-            revokes={'REVOKE SELECT ON staging.employee FROM "user_1";'},
+            revokes={'REVOKE SELECT ON staging.employee FROM \\"user_1\\";'},
         ),
         AccessManagementRow(
             project_name="my_project",
@@ -464,10 +464,10 @@ def test_generate_access_management_rows_extended_case_two_users():
             identity_type=IdentityType.USER,
             identity_name="user_2",
             grants={
-                'GRANT SELECT ON staging.employee TO "user_2";',
-                'GRANT USAGE ON SCHEMA staging TO "user_2";',
+                'GRANT USAGE ON SCHEMA staging TO \\"user_2\\";',
+                'GRANT SELECT ON staging.employee TO \\"user_2\\";',
             },
-            revokes={'REVOKE SELECT ON staging.employee FROM "user_2";'},
+            revokes={'REVOKE SELECT ON staging.employee FROM \\"user_2\\";'},
         ),
     ]
     result = generate_access_management_rows(

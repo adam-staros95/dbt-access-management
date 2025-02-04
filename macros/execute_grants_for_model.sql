@@ -12,11 +12,12 @@
             {% if database_identities | length > 0 %}
                 {% set identities_in_clause = identity_conditions | join(", ") %}
                 {% set query_config_table %}
-            SELECT grants::varchar AS grants
-            FROM access_management.{{project_name}}_config
+            SELECT json_parse(grants::varchar) AS grants
+            FROM access_management.{{project_name}}_access_management_config
             WHERE schema_name = '{{ this.schema }}'
             AND model_name = '{{ this.name }}'
-            AND (identity_type, identity_name) IN ({{ identities_in_clause }});
+            AND (identity_type, identity_name) IN ({{ identities_in_clause }})
+            AND created_timestamp = (SELECT MAX(created_timestamp) FROM access_management.{{project_name}}_access_management_config);
                 {% endset %}
 
                 {% set query_config_table_result = dbt.run_query(query_config_table) %}
@@ -24,9 +25,7 @@
                 {% set grant_queries = [] %}
 
                 {% for row in query_config_table_result.rows %}
-                    {{ log(row, info=True) }}
-                    {{ log(row.grants, info=True) }}
-                    {% do grant_queries.append(tojson("'"~row.grants~"'")) %}
+                    {% do grant_queries.append(fromjson(row.grants)) %}
                 {% endfor %}
 
                 {% set all_grants_for_a_model = [] %}
