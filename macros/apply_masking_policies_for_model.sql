@@ -1,4 +1,4 @@
-{% macro apply_masking_policies_for_model(on_masking_attached_function=none) %}
+{% macro apply_masking_policies_for_model() %}
     {% if execute %}
         {% if config.get('materialized') == 'ephemeral' %}
             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
@@ -45,7 +45,6 @@
             {% if configure_masking_query %}
                 {{ log(configure_masking_query, info=True) }}
                 {% do dbt.run_query(configure_masking_query) %}
-                {% do on_masking_attached_function() %}
             {% else %}
                 {{ log("No masking configured for " ~ this.schema ~ "." ~ this.name, info=True) }}
             {% endif %}

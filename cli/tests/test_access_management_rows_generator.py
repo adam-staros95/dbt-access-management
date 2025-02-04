@@ -2,7 +2,7 @@ from cli.access_management_config_file_parser import (
     AccessConfigIdentity,
     IdentityType,
     AccessLevel,
-    DataBaseAccessConfig, ModelPathAccessConfig,
+    DataBaseAccessConfig,
 )
 from cli.access_management_rows_generator import (
     AccessManagementRow,
@@ -20,7 +20,7 @@ def test_generate_access_management_rows_not_matching_paths():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/models", access_level=AccessLevel.READ)],
+                config_paths=[("/models", AccessLevel.READ)],
             )
         ],
     )
@@ -61,7 +61,7 @@ def test_generate_access_management_rows_simple_case_one_user():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             )
         ],
     )
@@ -105,12 +105,12 @@ def test_generate_access_management_rows_simple_case_two_users():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             ),
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_2",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             ),
         ],
     )
@@ -168,12 +168,12 @@ def test_generate_access_management_rows_simple_case_one_user_one_role():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             ),
             AccessConfigIdentity(
                 identity_type=IdentityType.ROLE,
                 identity_name="role_2",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             ),
         ],
     )
@@ -231,9 +231,9 @@ def test_generate_access_management_rows_extended_case_one_user():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[
-                    ModelPathAccessConfig(model_path="/models/", access_level=AccessLevel.READ),
-                    ModelPathAccessConfig(model_path="/models/staging/source_system_1/", access_level=AccessLevel.WRITE),
+                config_paths=[
+                    ("/models/", AccessLevel.READ),
+                    ("/models/staging/source_system_1/", AccessLevel.WRITE),
                 ],
             )
         ],
@@ -304,9 +304,9 @@ def test_generate_access_management_rows_extended_case_one_user_exact_path():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[
-                    ModelPathAccessConfig(model_path="/models/", access_level=AccessLevel.READ),
-                    ModelPathAccessConfig(model_path="/models/staging/source_system_1/user/", access_level=AccessLevel.WRITE),
+                config_paths=[
+                    ("/models/", AccessLevel.READ),
+                    ("/models/staging/source_system_1/user/", AccessLevel.WRITE),
                 ],
             )
         ],
@@ -377,15 +377,15 @@ def test_generate_access_management_rows_extended_case_two_users():
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_1",
-                model_path_access_configs=[
-                    ModelPathAccessConfig(model_path="/models/staging/source_system_1/", access_level=AccessLevel.WRITE),
-                    ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ),
+                config_paths=[
+                    ("/models/staging/source_system_1/", AccessLevel.WRITE),
+                    ("/", AccessLevel.READ),
                 ],
             ),
             AccessConfigIdentity(
                 identity_type=IdentityType.USER,
                 identity_name="user_2",
-                model_path_access_configs=[ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
+                config_paths=[("/", AccessLevel.READ)],
             ),
         ],
     )

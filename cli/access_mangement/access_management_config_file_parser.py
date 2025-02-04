@@ -22,7 +22,9 @@ class AccessLevel(str, Enum):
 class AccessConfigIdentity(BaseModel):
     identity_type: IdentityType
     identity_name: str
-    config_paths: List[Tuple[str, AccessLevel]]
+    config_paths: List[
+        Tuple[str, AccessLevel]
+    ]  # TODO: Rename to model_path_access_configs [ModelPathAccessConfig(model_path="/", access_level=AccessLevel.READ)],
     column_level_configs: Dict[str, Dict[str, AccessLevel]] = {}
 
 
@@ -42,8 +44,10 @@ def _read_config_file(config_file_path: str) -> Dict[str, Any]:
         return yaml.safe_load(file)
 
 
-def _extract_configs(
-    config: Dict[str, Any], current_path: str = "/"
+# TODO: Add unit tests
+# Visible for tests
+def extract_configs(
+        config: Dict[str, Any], current_path: str = "/"
 ) -> Tuple[List[Tuple[str, AccessLevel]], Dict[str, Dict[str, AccessLevel]]]:
     config_paths = []
     column_level_configs = {}
@@ -75,7 +79,7 @@ def _extract_configs(
             config_paths.append((current_path, access_level))
         else:
             new_path = current_path + key + "/"
-            sub_paths, sub_columns = _extract_configs(value, new_path)
+            sub_paths, sub_columns = extract_configs(value, new_path)
             config_paths.extend(sub_paths)
             for table, cols in sub_columns.items():
                 if table not in column_level_configs:
@@ -90,60 +94,40 @@ def parse_access_management_config(config_file_path: str) -> AccessManagementCon
     databases = data["databases"]
     databases_access_config = []
 
-    for database_name, entities in databases.items():
-        users_config = entities.get("users", {})
-        roles_config = entities.get("roles", {})
-        groups_config = entities.get("groups", {})
+    for database_name, identities in databases.items():
+        users_config = identities.get("users", {})
+        roles_config = identities.get("roles", {})
+        groups_config = identities.get("groups", {})
 
-        users_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
-                identity_type=IdentityType.USER,
-            )
-            for identity_name, config in users_config.items()
-        ]
-
-        roles_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
-                identity_type=IdentityType.ROLE,
-            )
-            for identity_name, config in roles_config.items()
-        ]
-
-        groups_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
-                identity_type=IdentityType.GROUP,
-            )
-            for identity_name, config in groups_config.items()
-        ]
-        def create_access_config_entities(
-            config: Dict[str, Any], entity_type: EntityType
-        ) -> List[AccessConfigEntity]:
+        def create_access_config_identities(
+                config: Dict[str, Any], identity_type: IdentityType
+        ) -> List[AccessConfigIdentity]:
             return [
-                AccessConfigEntity(
-                    entity_name=entity_name,
-                    config_paths=_extract_configs(config)[0],
-                    column_level_configs=_extract_configs(config)[1],
-                    entity_type=entity_type,
+                AccessConfigIdentity(
+                    identity_type=identity_type,
+                    identity_name=identity_name,
+                    config_paths=extract_configs(config)[0],
+                    column_level_configs=extract_configs(config)[1],
                 )
-                for entity_name, config in config.items()
+                for identity_name, config in config.items()
             ]
 
-        users_entities = create_access_config_entities(users_config, EntityType.USER)
-        roles_entities = create_access_config_entities(roles_config, EntityType.ROLE)
-        groups_entities = create_access_config_entities(groups_config, EntityType.GROUP)
+        users_identities = create_access_config_identities(
+            users_config, IdentityType.USER
+        )
+        roles_identities = create_access_config_identities(
+            roles_config, IdentityType.ROLE
+        )
+        groups_identities = create_access_config_identities(
+            groups_config, IdentityType.GROUP
+        )
 
         databases_access_config.append(
             DataBaseAccessConfig(
                 database_name=database_name,
-                access_config_identities=users_entities
-                + roles_entities
-                + groups_entities,
+                access_config_identities=users_identities
+                                         + roles_identities
+                                         + groups_identities,
             )
         )
 
