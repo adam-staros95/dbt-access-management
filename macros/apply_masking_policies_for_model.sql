@@ -1,10 +1,15 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
-        {% set snapshot_table_policies_existed_before_run = dbt_access_management.check_snapshot_table_has_masking_policies_attached(this.schema, this.name ) %}
+
+        {% if config.get('materialized') == 'snapshot' %}
+            {% set snapshot_table_policies_existed_before_run = dbt_access_management.check_model_has_masking_policies_attached(this.schema, this.name ) %}
+        {% else %} {% set snapshot_table_policies_existed_before_run = false %}
+        {% endif %}
+
         {% if config.get('materialized') == 'ephemeral' %}
             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
         {% elif snapshot_table_policies_existed_before_run %}
-            {{ log("Skipping attaching masking policies for " ~ this.name ~ " existing snapshot table", info=True) }}
+            {{ log("Skipping attaching masking policies for snapshot table: " ~ this.name ~ ", because masking policies are already applied.", info=True) }}
         {% elif config.get('materialized') in ['table', 'view'] or ('incremental' in config.get('materialized') and flags.FULL_REFRESH)
             or (config.get('materialized') == 'seed' and flags.FULL_REFRESH)
             or (config.get('materialized') == 'snapshot' and snapshot_table_policies_existed_before_run == false) %}

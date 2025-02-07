@@ -201,6 +201,7 @@ you need provide database name in which you want to create your models explicitl
 ---
 
 ## Engineering backlog
+- Add support for snapshot models.
 - Add support for column-level security.
 - Add support for row-level security.
 - Format code using tool like `SQLFluff` 
