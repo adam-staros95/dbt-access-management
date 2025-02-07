@@ -183,7 +183,7 @@
 {% macro get_detach_policies_query(policies_to_detach) %}
     {% set query %}
     {%- for policy_to_detach in policies_to_detach -%}
-    detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ({{ policy_to_detach['column_name'] }})
+    detach masking policy {{policy_to_detach['policy_name']}} on {{ policy_to_detach['schema_name'] }}.{{ policy_to_detach['model_name'] }} ("{{ policy_to_detach['column_name'] }}")
         {% if policy_to_detach['grantee'] == 'public' %}
             from public;
         {% elif policy_to_detach['grantee_type'] == 'role' %}
@@ -258,15 +258,15 @@
                 {%- if masking_policies['masking_policy'] is not none and masking_policies['unmasking_policy'] is not none -%}
                     {%- if policy_to_attach['grantee_type'] == 'public' -%}
                         ATTACH MASKING POLICY {{ masking_policies['masking_policy'] }}
-                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}("{{ policy_to_attach['column_name'] }}")
                         TO PUBLIC;
                     {%- elif policy_to_attach['grantee_type'] == 'role' -%}
                         ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
-                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}("{{ policy_to_attach['column_name'] }}")
                         TO ROLE "{{ policy_to_attach['grantee'] }}" PRIORITY 10;
                     {%- else -%}
                         ATTACH MASKING POLICY {{ masking_policies['unmasking_policy'] }}
-                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}({{ policy_to_attach['column_name'] }})
+                        ON {{ policy_to_attach['schema_name'] }}.{{ policy_to_attach['model_name'] }}("{{ policy_to_attach['column_name'] }}")
                         TO "{{ policy_to_attach['grantee'] }}" PRIORITY 10;
                     {%- endif -%}
                 {% endif %}

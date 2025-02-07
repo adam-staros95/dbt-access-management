@@ -1,16 +1,23 @@
 {% macro apply_masking_policies_for_model() %}
     {% if execute %}
+
+        {% if config.get('materialized') == 'snapshot' %}
+            {% set snapshot_table_policies_existed_before_run = dbt_access_management.check_model_has_masking_policies_attached(this.schema, this.name ) %}
+        {% else %} {% set snapshot_table_policies_existed_before_run = false %}
+        {% endif %}
+
         {% if config.get('materialized') == 'ephemeral' %}
             {{ log("Skipping attaching masking policies for " ~ this.name ~ " ephemeral model", info=True) }}
+        {% elif snapshot_table_policies_existed_before_run %}
+            {{ log("Skipping attaching masking policies for snapshot table: " ~ this.name ~ ", because masking policies are already applied.", info=True) }}
         {% elif config.get('materialized') in ['table', 'view'] or ('incremental' in config.get('materialized') and flags.FULL_REFRESH)
-            or (config.get('materialized') == 'seed' and flags.FULL_REFRESH) %}
+            or (config.get('materialized') == 'seed' and flags.FULL_REFRESH)
+            or (config.get('materialized') == 'snapshot' and snapshot_table_policies_existed_before_run == false) %}
             {% set database_identities = dbt_access_management.get_database_identities() %}
             {% set users_identities = dbt_access_management.get_users(database_identities) %}
             {% set roles_identities = dbt_access_management.get_roles(database_identities) %}
             {% set masking_configs =  dbt_access_management.get_masking_configs_for_model() %}
-
             {% set columns = adapter.get_columns_in_relation(this) %}
-
             {% set configure_masking_query -%}
                 {%- for masking_config in masking_configs -%}
                     {%- for col in columns -%}

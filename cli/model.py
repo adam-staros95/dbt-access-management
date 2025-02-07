@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class ModelType(str, Enum):
     MODEL = "model"
     SEED = "seed"
+    SNAPSHOT = "snapshot"
 
 
 # TODO: Add `materialization` enum
