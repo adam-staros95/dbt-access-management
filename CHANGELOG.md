@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 0.3.0
+- Added support for `snapshot` models
+
 ## Version 0.2.7
 - Fixed a bug where the target and vars were not passed to the dbt `run-operation` command, causing the operation to execute on the default target
 
