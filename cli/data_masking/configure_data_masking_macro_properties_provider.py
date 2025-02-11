@@ -1,16 +1,28 @@
 import json
+import os
 import time
 from datetime import datetime
-from typing import List
+from typing import List, Any, Dict
 
-from cli.data_masking.data_masking_config_file_parser import (
-    parse_data_masking_config,
-)
+import yaml
+
+from cli.data_masking.data_masking_config_parser import parse_data_masking_config
 from cli.data_masking.data_masking_rows_generator import (
     generate_data_masking_rows,
     DataMaskingRow,
 )
+from cli.exceptions import DataMaskingConfigFileNotFoundException
 from cli.model import ConfigureMacroProperties, ManifestNode
+
+
+def _read_config_file(config_file_path: str) -> Dict[str, Any]:
+    file_path = os.path.join(config_file_path)
+
+    if not os.path.exists(file_path):
+        raise DataMaskingConfigFileNotFoundException(file_path)
+
+    with open(file_path, "r") as file:
+        return yaml.safe_load(file)
 
 
 def _build_create_data_masking_config_table_sql(
@@ -67,7 +79,8 @@ def get_configure_data_masking_macro_properties(
     config_file_path: str,
     project_name: str,
 ) -> ConfigureMacroProperties:
-    data_masking_config = parse_data_masking_config(config_file_path)
+    config_file_data = _read_config_file(config_file_path)
+    data_masking_config = parse_data_masking_config(config_file_data)
     data_masking_rows = generate_data_masking_rows(data_masking_config, manifest_nodes)
 
     temp_data_masking_config_table_name = (

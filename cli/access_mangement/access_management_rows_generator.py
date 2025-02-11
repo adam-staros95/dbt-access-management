@@ -2,7 +2,7 @@ from typing import List, Set
 
 from pydantic import BaseModel
 
-from cli.access_mangement.access_management_config_file_parser import (
+from cli.access_mangement.access_management_config_parser import (
     IdentityType,
     DataBaseAccessConfig,
     AccessLevel,

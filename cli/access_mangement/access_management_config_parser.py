@@ -1,11 +1,7 @@
-import os
 from enum import Enum
 from typing import List, Any, Dict, Tuple
 
-import yaml
 from pydantic import BaseModel
-
-from cli.exceptions import AccessManagementConfigFileNotFoundException
 
 
 class IdentityType(str, Enum):
@@ -36,16 +32,6 @@ class AccessManagementConfig(BaseModel):
     databases_access_config: List[DataBaseAccessConfig]
 
 
-def _read_config_file(config_file_path: str) -> Dict[str, Any]:
-    file_path = os.path.join(config_file_path)
-
-    if not os.path.exists(file_path):
-        raise AccessManagementConfigFileNotFoundException(file_path)
-
-    with open(file_path, "r") as file:
-        return yaml.safe_load(file)
-
-
 # Visible for tests
 def extract_configs(
     config: Dict[str, Any], current_path: str = "/"
@@ -61,8 +47,7 @@ def extract_configs(
     return config_paths
 
 
-def parse_access_management_config(config_file_path: str) -> AccessManagementConfig:
-    data = _read_config_file(config_file_path)
+def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConfig:
     databases = data["databases"]
     databases_access_config = []
 

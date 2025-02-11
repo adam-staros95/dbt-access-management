@@ -1,9 +1,12 @@
 import json
+import os
 import time
 from datetime import datetime
-from typing import List
+from typing import List, Any, Dict
 
-from cli.access_mangement.access_management_config_file_parser import (
+import yaml
+
+from cli.access_mangement.access_management_config_parser import (
     parse_access_management_config,
     AccessManagementConfig,
 )
@@ -11,11 +14,21 @@ from cli.access_mangement.access_management_rows_generator import (
     generate_access_management_rows,
     AccessManagementRow,
 )
-
+from cli.exceptions import AccessManagementConfigFileNotFoundException
 from cli.exceptions import (
     DatabaseAccessManagementConfigNotExistsException,
 )
 from cli.model import ConfigureMacroProperties, ManifestNode
+
+
+def _read_config_file(config_file_path: str) -> Dict[str, Any]:
+    file_path = os.path.join(config_file_path)
+
+    if not os.path.exists(file_path):
+        raise AccessManagementConfigFileNotFoundException(file_path)
+
+    with open(file_path, "r") as file:
+        return yaml.safe_load(file)
 
 
 def _get_access_management_rows(
@@ -96,7 +109,8 @@ def get_configure_access_management_macro_properties(
     database_name: str,
     project_name: str,
 ) -> ConfigureMacroProperties:
-    access_management_config = parse_access_management_config(config_file_path)
+    config_file_data = _read_config_file(config_file_path)
+    access_management_config = parse_access_management_config(config_file_data)
     access_management_rows = _get_access_management_rows(
         manifest_nodes,
         access_management_config,
