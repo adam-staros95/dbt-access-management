@@ -32,8 +32,7 @@ class AccessManagementConfig(BaseModel):
     databases_access_config: List[DataBaseAccessConfig]
 
 
-# Visible for tests
-def extract_configs(
+def _extract_configs(
     config: Dict[str, Any], current_path: str = "/"
 ) -> List[Tuple[str, AccessLevel]]:
     config_paths = []
@@ -43,7 +42,7 @@ def extract_configs(
             config_paths.append((current_path, access_level))
         else:
             new_path = current_path + key + "/"
-            config_paths.extend(extract_configs(value, new_path))
+            config_paths.extend(_extract_configs(value, new_path))
     return config_paths
 
 
@@ -59,7 +58,7 @@ def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConf
         users_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=extract_configs(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.USER,
             )
             for identity_name, config in users_config.items()
@@ -68,7 +67,7 @@ def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConf
         roles_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=extract_configs(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.ROLE,
             )
             for identity_name, config in roles_config.items()
@@ -77,7 +76,7 @@ def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConf
         groups_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=extract_configs(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.GROUP,
             )
             for identity_name, config in groups_config.items()
