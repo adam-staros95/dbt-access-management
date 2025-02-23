@@ -1,11 +1,7 @@
-import os
 from enum import Enum
 from typing import List, Any, Dict, Tuple
 
-import yaml
 from pydantic import BaseModel
-
-from cli.exceptions import AccessManagementConfigFileNotFoundException
 
 
 class IdentityType(str, Enum):
@@ -36,18 +32,8 @@ class AccessManagementConfig(BaseModel):
     databases_access_config: List[DataBaseAccessConfig]
 
 
-def _read_config_file(config_file_path: str) -> Dict[str, Any]:
-    file_path = os.path.join(config_file_path)
-
-    if not os.path.exists(file_path):
-        raise AccessManagementConfigFileNotFoundException(file_path)
-
-    with open(file_path, "r") as file:
-        return yaml.safe_load(file)
-
-
-def _extract_config_paths(
-    config: Dict[str, Any], current_path: str
+def _extract_configs(
+    config: Dict[str, Any], current_path: str = "/"
 ) -> List[Tuple[str, AccessLevel]]:
     config_paths = []
     for key, value in config.items():
@@ -56,12 +42,11 @@ def _extract_config_paths(
             config_paths.append((current_path, access_level))
         else:
             new_path = current_path + key + "/"
-            config_paths.extend(_extract_config_paths(value, new_path))
+            config_paths.extend(_extract_configs(value, new_path))
     return config_paths
 
 
-def parse_access_management_config(config_file_path: str) -> AccessManagementConfig:
-    data = _read_config_file(config_file_path)
+def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConfig:
     databases = data["databases"]
     databases_access_config = []
 
@@ -73,7 +58,7 @@ def parse_access_management_config(config_file_path: str) -> AccessManagementCon
         users_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.USER,
             )
             for identity_name, config in users_config.items()
@@ -82,7 +67,7 @@ def parse_access_management_config(config_file_path: str) -> AccessManagementCon
         roles_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.ROLE,
             )
             for identity_name, config in roles_config.items()
@@ -91,7 +76,7 @@ def parse_access_management_config(config_file_path: str) -> AccessManagementCon
         groups_entities = [
             AccessConfigIdentity(
                 identity_name=identity_name,
-                config_paths=_extract_config_paths(config, "/"),
+                config_paths=_extract_configs(config, "/"),
                 identity_type=IdentityType.GROUP,
             )
             for identity_name, config in groups_config.items()

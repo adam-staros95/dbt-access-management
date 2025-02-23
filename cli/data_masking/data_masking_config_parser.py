@@ -1,10 +1,6 @@
-import os
 from typing import List, Any, Dict
 
-import yaml
 from pydantic import BaseModel
-
-from cli.exceptions import DataMaskingConfigFileNotFoundException
 
 
 class ColumnMaskingConfig(BaseModel):
@@ -22,16 +18,6 @@ class DataMaskingConfig(BaseModel):
     model_masking_identities: List[ModelDataMaskingConfig]
 
 
-def _read_config_file(config_file_path: str) -> Dict[str, Any]:
-    file_path = os.path.join(config_file_path)
-
-    if not os.path.exists(file_path):
-        raise DataMaskingConfigFileNotFoundException(file_path)
-
-    with open(file_path, "r") as file:
-        return yaml.safe_load(file)
-
-
 def _parse_columns_config(columns_config: List[Dict]) -> List[ColumnMaskingConfig]:
     columns_masking_config = []
     for column_config in columns_config:
@@ -46,8 +32,7 @@ def _parse_columns_config(columns_config: List[Dict]) -> List[ColumnMaskingConfi
     return columns_masking_config
 
 
-def parse_data_masking_config(config_file_path: str) -> DataMaskingConfig:
-    data = _read_config_file(config_file_path)
+def parse_data_masking_config(data: Dict[str, Any]) -> DataMaskingConfig:
     tables_config = data["configuration"]
     data_masking_config = []
     for table_config in tables_config:

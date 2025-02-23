@@ -1,4 +1,4 @@
-from cli.data_masking.data_masking_config_file_parser import (
+from cli.data_masking.data_masking_config_parser import (
     DataMaskingConfig,
     ModelDataMaskingConfig,
     ColumnMaskingConfig,

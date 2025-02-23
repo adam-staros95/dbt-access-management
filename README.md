@@ -207,7 +207,10 @@ you need provide database name in which you want to create your models explicitl
 - Implement a `--dryrun` option to display the SQL commands to be executed without actually running them.
 - Implement a `--skip-compile` option to bypass the `dbt compile` step during the `dbt-am configure` command.
 - Enhance the tool to read database system tables to maintain privilege configurations, ensuring consistency and avoiding external changes.
-- Rename the `access_management.yml` file to privileges.yml and update corresponding configuration table names.
+- Rename the `access_management.yml` file to `privileges.yml` and update corresponding configuration table names.
+- Remove from `access_management.yml`/`privileges.yml` per database config, as it is not used in projects. 
+Thanks to this change configuration file will be smaller and more consistent with `data_masking.yml`.
+If user wants to maintain different privileges per database, there is option to create multiple files and pass them to the `dbt-am` command.
 
 ---
 

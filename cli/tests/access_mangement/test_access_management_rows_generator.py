@@ -1,4 +1,4 @@
-from cli.access_mangement.access_management_config_file_parser import (
+from cli.access_mangement.access_management_config_parser import (
     AccessConfigIdentity,
     IdentityType,
     AccessLevel,
