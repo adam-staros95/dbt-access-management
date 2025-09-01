@@ -77,7 +77,7 @@ seeds:
       - {{ dbt_access_management.apply_masking_policies_for_model() }}
 ```
 
-If you don't want to configure database privileges, you can skip adding the `execute_grants_for_model` macro. 
+If you don't want to configure database permissions, you can skip adding the `execute_grants_for_model` macro. 
 Similarly, if you don't want to configure data masking, you can skip adding the `apply_masking_policies_for_model` macro.
 
 ### Create `access_management.yml` file
@@ -86,7 +86,7 @@ This file defines the access levels for different users, roles, and groups acros
 If your project supports multiple environments or databases, you can list them all in a single configuration file.
 By default, file should be created in the same directory as your dbt_project.yml file. 
 
-You can skip this step if you don't want to configure database privileges.
+You can skip this step if you don't want to configure database permissions.
 #### Sample file
 
 ```yaml
@@ -189,9 +189,9 @@ This command:
 `dbt-am configure` supports following options:
 
 - `--configure-access-management` - set to `False` to disable privilege configuration (e.g., for data masking only).
-- `--configure-data-masking` - set to `False` to disable data masking configuration (e.g., for privileges only).
+- `--configure-data-masking` - set to `False` to disable data masking configuration (e.g., for permissions only).
 - `--access-management-config-file-path` - specify a custom location for the `access_management.yml` file.
-Can be used to configure database privileges in multiple files depending on environment.
+Can be used to configure database permissions in multiple files depending on environment.
 - `--data-masking-config-file-path` - specify a custom location for the `data_masking.yml` file.
 Can be used to configure data masking differently depending on environment.
 - `--database-name` - by default information about database name will be read from `manifest.json` file after project compilation. However,
@@ -207,10 +207,10 @@ you need provide database name in which you want to create your models explicitl
 - Implement a `--dryrun` option to display the SQL commands to be executed without actually running them.
 - Implement a `--skip-compile` option to bypass the `dbt compile` step during the `dbt-am configure` command.
 - Enhance the tool to read database system tables to maintain privilege configurations, ensuring consistency and avoiding external changes.
-- Rename the `access_management.yml` file to `privileges.yml` and update corresponding configuration table names.
-- Remove from `access_management.yml`/`privileges.yml` per database config, as it is not used in projects. 
+- Rename the `access_management.yml` file to `permissions.yml` and update corresponding configuration table names.
+- Remove from `access_management.yml`/`permissions.yml` per database config, as it is not used in projects. 
 Thanks to this change configuration file will be smaller and more consistent with `data_masking.yml`.
-If user wants to maintain different privileges per database, there is option to create multiple files and pass them to the `dbt-am` command.
+If user wants to maintain different permissions per database, there is option to create multiple files and pass them to the `dbt-am` command.
 
 ---
 

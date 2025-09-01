@@ -16,11 +16,15 @@ class AccessLevel(str, Enum):
     READ_WRITE = "read_write"
     ALL = "all"
 
+# TODO: Continue
+class ConfigPath(BaseModel):
+    path: str
+    access_level: AccessLevel
 
 class AccessConfigIdentity(BaseModel):
     identity_type: IdentityType
     identity_name: str
-    config_paths: List[Tuple[str, AccessLevel]]
+    config_paths: List[ConfigPath]
 
 
 class DataBaseAccessConfig(BaseModel):
