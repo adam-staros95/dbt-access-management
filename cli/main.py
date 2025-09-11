@@ -10,9 +10,13 @@ from dbt.contracts.graph.manifest import Manifest
 from cli.access_mangement.configure_access_management_macro_properties_provider import (
     get_configure_access_management_macro_properties,
 )
-from cli.constants import SUPPORTED_SQL_ENGINES
+from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine
 from cli.data_masking.configure_data_masking_macro_properties_provider import (
     get_configure_data_masking_macro_properties,
+)
+from cli.databricks_exceptions import (
+    WorkspaceNameNotProvidedException,
+    CatalogNameNotProvidedException,
 )
 from cli.exceptions import (
     MultipleDatabaseNamesException,
@@ -70,6 +74,7 @@ def _get_manifest_nodes_eligible_for_configuration(
                 ManifestNode(
                     database_name=node.database,
                     model_type=ModelType.MODEL,
+                    alias=node.alias,
                     model_name=node.name,
                     schema_name=node.schema,
                     materialization=node.config.materialized,
@@ -87,6 +92,7 @@ def _get_manifest_nodes_eligible_for_configuration(
                 ManifestNode(
                     database_name=node.database,
                     model_type=ModelType.SEED,
+                    alias=node.alias,
                     model_name=node.name,
                     schema_name=node.schema,
                     materialization=node.config.materialized,
@@ -110,6 +116,7 @@ def _get_manifest_nodes_eligible_for_configuration(
                     path=node.original_file_path
                     if os.name != "nt"
                     else node.original_file_path.replace("\\", "/"),
+                    alias=node.alias,
                 )
             )
     return result
@@ -261,8 +268,19 @@ def cli():
 @click.option(
     "--database-name",
     help="Database name for which you want to configure access management. "
-    "It it required to specify database name in "
+    "It it required to specify database name in Redshift"
     "multi project setup (for example using meshify or dbt-loom)",
+    type=str,
+)
+@click.option(
+    "--workspace-name",
+    help="Workspace name for which you want to configure access management. "
+    "It it required databricks parameter",
+    type=str,
+)
+@click.option(
+    "--catalog-name",
+    help="Catalog to store access management configuration. It it required databricks parameter",
     type=str,
 )
 def configure(
@@ -272,6 +290,8 @@ def configure(
     access_management_config_file_path: str,
     data_masking_config_file_path: str,
     database_name: str = None,
+    workspace_name: str = None,
+    catalog_name: str = None,
 ):
     command_list = _get_command_list(dbt_command)
     target = _get_target(command_list)
@@ -288,10 +308,20 @@ def configure(
     manifest_nodes = _get_manifest_nodes_eligible_for_configuration(
         manifest, project_name
     )
-    database_name = _get_database_name(manifest_nodes, database_name)
-    click.echo(
-        f"Running dbt-access-management configurations on {database_name} database..."
-    )
+    if sql_engine == SQLEngine.REDSHIFT:
+        environment_name = _get_database_name(manifest_nodes, database_name)
+        click.echo(
+            f"Running dbt-access-management configurations on {environment_name} database..."
+        )
+    if sql_engine == SQLEngine.DATABRICKS:
+        if not workspace_name:
+            raise WorkspaceNameNotProvidedException()
+        if not catalog_name:
+            raise CatalogNameNotProvidedException()
+        environment_name = workspace_name
+        click.echo(
+            f"Running dbt-access-management configurations on {environment_name} workspace..."
+        )
 
     configure_access_management_macro_properties = (
         (
@@ -299,8 +329,9 @@ def configure(
                 manifest_nodes=manifest_nodes,
                 config_file_path=access_management_config_file_path,
                 sql_engine=sql_engine,
-                database_name=database_name,
+                environment_name=environment_name,
                 project_name=project_name,
+                catalog_name=catalog_name,
             )
         )
         if configure_access_management

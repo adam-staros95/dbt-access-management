@@ -1,4 +1,4 @@
-{% macro execute_grants_for_model() %}
+{% macro redshift__execute_grants() %}
     {% if execute %}
         {% if config.get('materialized') != 'ephemeral' %}
             {% set database_identities = dbt_access_management.get_database_identities() %}
@@ -15,7 +15,7 @@
             SELECT json_parse(grants::varchar) AS grants
             FROM access_management.{{project_name}}_access_management_config
             WHERE schema_name = '{{ this.schema }}'
-            AND model_name = '{{ this.name }}'
+            AND alias = '{{ this.name }}'
             AND (identity_type, identity_name) IN ({{ identities_in_clause }})
             AND created_timestamp = (SELECT MAX(created_timestamp) FROM access_management.{{project_name}}_access_management_config);
                 {% endset %}

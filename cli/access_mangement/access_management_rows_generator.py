@@ -8,7 +8,8 @@ from cli.access_mangement.access_management_config_parser import (
     AccessLevel,
     AccessConfigIdentity,
 )
-from cli.constants import SUPPORTED_SQL_ENGINES
+from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine
+from cli.databricks_exceptions import NotSupportedMaterializationException
 from cli.model import ManifestNode, ModelType
 
 
@@ -16,6 +17,7 @@ class AccessManagementRow(BaseModel):
     project_name: str
     database_name: str
     schema_name: str
+    alias: str
     model_name: str
     materialization: str
     identity_type: IdentityType
@@ -51,21 +53,55 @@ def generate_access_management_rows(
                     or node.model_type == ModelType.SNAPSHOT
                 ):
                     if f"/{node.path.replace('.sql', '/')}".startswith(path):
-                        grants_per_node = _get_grant_statements(
-                            access_level, identity, node
+                        grants_per_node = (
+                            _get_grant_statements_redshift(access_level, identity, node)
+                            if sql_engine == SQLEngine.REDSHIFT
+                            else _get_grant_statements_databricks(
+                                access_level,
+                                identity,
+                                node,
+                            )
                         )
-                        revokes_per_node = _get_revoke_statements(
-                            access_level, identity, node
+                        revokes_per_node = (
+                            _get_revoke_statements_redshift(
+                                access_level, identity, node
+                            )
+                            if sql_engine == SQLEngine.REDSHIFT
+                            else _get_revoke_statements_databricks(
+                                access_level,
+                                identity,
+                                node,
+                            )
                         )
                         break
 
                 if node.model_type == ModelType.SEED:
                     if f"/{node.path.replace('.csv', '/')}".startswith(path):
-                        grants_per_node = _get_grant_statements(
-                            access_level, identity, node
+                        grants_per_node = (
+                            _get_grant_statements_redshift(
+                                access_level,
+                                identity,
+                                node,
+                            )
+                            if sql_engine == SQLEngine.REDSHIFT
+                            else _get_grant_statements_databricks(
+                                access_level,
+                                identity,
+                                node,
+                            )
                         )
-                        revokes_per_node = _get_revoke_statements(
-                            access_level, identity, node
+                        revokes_per_node = (
+                            _get_revoke_statements_redshift(
+                                access_level,
+                                identity,
+                                node,
+                            )
+                            if sql_engine == SQLEngine.REDSHIFT
+                            else _get_revoke_statements_databricks(
+                                access_level,
+                                identity,
+                                node,
+                            )
                         )
                         break
 
@@ -73,6 +109,7 @@ def generate_access_management_rows(
                 project_name=project_name,
                 database_name=node.database_name,
                 schema_name=node.schema_name,
+                alias=node.alias,
                 model_name=node.model_name,
                 materialization=node.materialization,
                 identity_type=identity.identity_type,
@@ -85,7 +122,7 @@ def generate_access_management_rows(
     return access_management_rows
 
 
-def _get_identity_name_with_keyword_for_identity_type(
+def _get_identity_name_with_keyword_for_identity_type_redshift(
     identity: AccessConfigIdentity,
 ) -> str:
     if identity.identity_type == IdentityType.ROLE:
@@ -96,12 +133,14 @@ def _get_identity_name_with_keyword_for_identity_type(
         return f'\\"{identity.identity_name}\\"'
 
 
-def _get_grant_statements(
-    access_level: AccessLevel, entity: AccessConfigIdentity, node: ManifestNode
+def _get_grant_statements_redshift(
+    access_level: AccessLevel,
+    identity: AccessConfigIdentity,
+    node: ManifestNode,
 ) -> Set[str]:
     grants = set()
-    identity_name_with_keyword = _get_identity_name_with_keyword_for_identity_type(
-        entity
+    identity_name_with_keyword = (
+        _get_identity_name_with_keyword_for_identity_type_redshift(identity)
     )
 
     grants.add(
@@ -109,67 +148,162 @@ def _get_grant_statements(
     )
     if access_level == AccessLevel.READ:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT SELECT ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.WRITE:
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT INSERT ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT UPDATE ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.READ_WRITE:
         grants.add(
-            f"GRANT SELECT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT SELECT ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
         grants.add(
-            f"GRANT INSERT ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT INSERT ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
         grants.add(
-            f"GRANT UPDATE ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT UPDATE ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.ALL:
         grants.add(
-            f"GRANT ALL ON {node.schema_name}.{node.model_name} TO {identity_name_with_keyword};"
+            f"GRANT ALL ON {node.schema_name}.{node.alias} TO {identity_name_with_keyword};"
         )
 
     return grants
 
 
-def _get_revoke_statements(
+def _get_revoke_statements_redshift(
     access_level: AccessLevel,
-    entity: AccessConfigIdentity,
+    identity: AccessConfigIdentity,
     node: ManifestNode,
 ) -> Set[str]:
     revokes = set()
-    identity_name_with_keyword = _get_identity_name_with_keyword_for_identity_type(
-        entity
+    identity_name_with_keyword = (
+        _get_identity_name_with_keyword_for_identity_type_redshift(identity)
     )
 
     if access_level == AccessLevel.READ:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE SELECT ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.WRITE:
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE INSERT ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE UPDATE ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.READ_WRITE:
         revokes.add(
-            f"REVOKE SELECT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE SELECT ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
         revokes.add(
-            f"REVOKE INSERT ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE INSERT ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
         revokes.add(
-            f"REVOKE UPDATE ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE UPDATE ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
     if access_level == AccessLevel.ALL:
         revokes.add(
-            f"REVOKE ALL ON {node.schema_name}.{node.model_name} FROM {identity_name_with_keyword};"
+            f"REVOKE ALL ON {node.schema_name}.{node.alias} FROM {identity_name_with_keyword};"
         )
 
+    return revokes
+
+
+def _get_materialization_to_securable_object_type_databricks(
+    materialization: str,
+) -> str:
+    materialization_to_securable_object_type_map = {
+        "view": "VIEW",
+        "materialized_view": "MATERIALIZED VIEW",
+        "table": "TABLE",
+        "streaming_table": "TABLE",
+        "incremental": "TABLE",
+    }
+    securable_object_type = materialization_to_securable_object_type_map.get(
+        materialization.lower(), None
+    )
+    if not securable_object_type:
+        raise NotSupportedMaterializationException(
+            provided_materialization=materialization,
+            supported_materializations=list(
+                materialization_to_securable_object_type_map.values()
+            ),
+        )
+    return securable_object_type
+
+
+def _get_grant_statements_databricks(
+    access_level: AccessLevel,
+    identity: AccessConfigIdentity,
+    node: ManifestNode,
+) -> Set[str]:
+    grants = set()
+
+    securable_object_type = _get_materialization_to_securable_object_type_databricks(
+        node.materialization
+    )
+
+    grants.add(
+        f"GRANT USE CATALOG ON CATALOG {node.database_name} TO `{identity.identity_name}`"
+    )
+    grants.add(
+        f"GRANT USE SCHEMA ON SCHEMA {node.database_name}.{node.schema_name} TO `{identity.identity_name}`"
+    )
+    if access_level == AccessLevel.READ:
+        grants.add(
+            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.WRITE:
+        grants.add(
+            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.READ_WRITE:
+        grants.add(
+            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+        )
+        grants.add(
+            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.ALL:
+        grants.add(
+            f"GRANT ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+        )
+    return grants
+
+
+def _get_revoke_statements_databricks(
+    access_level: AccessLevel,
+    identity: AccessConfigIdentity,
+    node: ManifestNode,
+) -> Set[str]:
+    revokes = set()
+
+    securable_object_type = _get_materialization_to_securable_object_type_databricks(
+        node.materialization
+    )
+
+    if access_level == AccessLevel.READ:
+        revokes.add(
+            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.WRITE:
+        revokes.add(
+            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.READ_WRITE:
+        revokes.add(
+            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+        )
+        revokes.add(
+            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+        )
+    if access_level == AccessLevel.ALL:
+        revokes.add(
+            f"REVOKE ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+        )
     return revokes

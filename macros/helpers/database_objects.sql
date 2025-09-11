@@ -1,4 +1,8 @@
 {% macro get_objects_in_database() %}
+    {{ adapter.dispatch('get_objects_in_database')() }}
+{% endmacro %}
+
+{% macro redshift__get_objects_in_database() %}
     {% set objects_in_database = [] %}
     {% set query %}
     SELECT
@@ -20,4 +24,8 @@
         {% endfor %}
     {% endif %}
     {{ return(objects_in_database) }}
+{% endmacro %}
+
+{% macro databricks__get_objects_in_database() %}
+    {{ log("SKIPPING databricks__get_objects_in_database", info=True) }}
 {% endmacro %}

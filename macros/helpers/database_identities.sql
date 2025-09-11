@@ -1,5 +1,8 @@
 {% macro get_database_identities() %}
+    {{ adapter.dispatch('get_database_identities')() }}
+{% endmacro %}
 
+{% macro redshift__get_database_identities() %}
     {% set query_identities %}
         SELECT usename AS identity_name, 'user' AS identity_type FROM PG_USER
         UNION ALL
@@ -19,7 +22,15 @@
     {{ return(identities) }}
 {% endmacro %}
 
+{% macro databricks__get_database_identities() %}
+    {{ log("SKIPPING databricks__get_database_identities", info=True) }}
+{% endmacro %}
+
 {% macro get_users(database_identities) %}
+    {{ adapter.dispatch('get_users')(database_identities) }}
+{% endmacro %}
+
+{% macro redshift__get_users(database_identities) %}
     {% set users = [] %}
     {% for identity in database_identities %}
         {% if identity['identity_type'] == 'user' %}
@@ -29,7 +40,15 @@
     {{ return(users) }}
 {% endmacro %}
 
+{% macro databricks__get_users() %}
+    {{ log("SKIPPING databricks__get_users", info=True) }}
+{% endmacro %}
+
 {% macro get_roles(database_identities) %}
+    {{ adapter.dispatch('get_roles')(database_identities) }}
+{% endmacro %}
+
+{% macro redshift__get_roles(database_identities) %}
     {% set roles = [] %}
     {% for identity in database_identities %}
         {% if identity['identity_type'] == 'role' %}
@@ -37,4 +56,8 @@
         {% endif %}
     {% endfor %}
     {{ return(roles) }}
+{% endmacro %}
+
+{% macro default__get_roles(database_identities) %}
+    {% set roles = [] %} {{ return(roles) }}
 {% endmacro %}

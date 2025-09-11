@@ -13,6 +13,7 @@ class ModelType(str, Enum):
 class ManifestNode(BaseModel):
     database_name: str
     model_type: ModelType
+    alias: str
     model_name: str
     schema_name: str
     materialization: str

@@ -47,7 +47,7 @@ def _extract_configs(
 
 
 def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConfig:
-    databases = data["databases"]
+    databases = data["databases"] if "databases" in data else data["workspaces"]
     databases_access_config = []
 
     for database_name, entities in databases.items():

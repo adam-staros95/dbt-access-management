@@ -68,17 +68,17 @@ To configure the tool in your project go through following steps:
 models:
   jaffle_shop:
      +post-hook:
-      - {{ dbt_access_management.execute_grants_for_model() }}
-      - {{ dbt_access_management.apply_masking_policies_for_model() }}
+      - {{ dbt_access_management.execute_grants() }}
+      - {{ dbt_access_management.mask_data() }}
 seeds:
   jaffle_shop:
      +post-hook:
-      - {{ dbt_access_management.execute_grants_for_model() }}
-      - {{ dbt_access_management.apply_masking_policies_for_model() }}
+      - {{ dbt_access_management.execute_grants() }}
+      - {{ dbt_access_management.mask_data() }}
 ```
 
-If you don't want to configure database privileges, you can skip adding the `execute_grants_for_model` macro. 
-Similarly, if you don't want to configure data masking, you can skip adding the `apply_masking_policies_for_model` macro.
+If you don't want to configure database privileges, you can skip adding the `execute_grants` macro. 
+Similarly, if you don't want to configure data masking, you can skip adding the `mask_data` macro.
 
 ### Create `access_management.yml` file
 
@@ -123,7 +123,9 @@ databases:
 
 Notes:
 - `jaffle_shop_dev`, `jaffle_shop_test` and `jaffle_shop_prod` are databases where dbt models are created.
+- In Databricks use `workspaces` instead of `databases`
 - Entity names under the `users`, `roles`, and `groups` sections are case-sensitive.
+- `roles` are not supported in Databricks.
 
 Supported access levels:
 - `read`
@@ -211,7 +213,8 @@ you need provide database name in which you want to create your models explicitl
 - Remove from `access_management.yml`/`privileges.yml` per database config, as it is not used in projects. 
 Thanks to this change configuration file will be smaller and more consistent with `data_masking.yml`.
 If user wants to maintain different privileges per database, there is option to create multiple files and pass them to the `dbt-am` command.
-
+- Add support for multi-database configurations in Redshift. 
+Currently, dbt-am does not work correctly in Redshift when models are configured across multiple databases within a single dbt project.
 ---
 
 ## Known caveats

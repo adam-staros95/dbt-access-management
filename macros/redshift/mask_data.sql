@@ -1,4 +1,4 @@
-{% macro apply_masking_policies_for_model() %}
+{% macro redshift__mask_data() %}
     {% if execute %}
 
         {% if config.get('materialized') == 'snapshot' %}
@@ -64,7 +64,7 @@
 {% macro get_masking_configs_for_model() %}
     {% set query_config_table %}
         select c.column_name, c.users_with_access, c.roles_with_access from access_management.{{project_name}}_data_masking_config  as t, t.masking_config as c
-        where schema_name = '{{ this.schema }}' and model_name = '{{ this.name }}'
+        where schema_name = '{{ this.schema }}' and alias = '{{ this.name }}'
         and created_timestamp = (select max(created_timestamp) from access_management.{{project_name}}_data_masking_config);
     {% endset %}
 
@@ -79,4 +79,17 @@
         }) %}
     {% endfor %}
     {{ return(masking_config) }}
+{% endmacro %}
+
+{% macro check_model_has_masking_policies_attached(schema_name, table_name) %}
+    {% set has_policies_attached_query -%}
+                    SELECT EXISTS (
+                    SELECT table_name
+                    FROM SVV_ATTACHED_MASKING_POLICY
+                    WHERE schema_name = '{{ schema_name }}'
+                    AND table_name = '{{ table_name }}'
+                );
+    {%- endset %}
+    {% set has_policies_attached_query_results = dbt.run_query(has_policies_attached_query) %}
+    {{ return(has_policies_attached_query_results.rows[0][0]) }}
 {% endmacro %}
