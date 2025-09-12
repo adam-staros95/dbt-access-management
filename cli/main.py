@@ -10,17 +10,13 @@ from dbt.contracts.graph.manifest import Manifest
 from cli.access_mangement.configure_access_management_macro_properties_provider import (
     get_configure_access_management_macro_properties,
 )
-from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine
+from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine, DEFAULT_SCHEMA_NAME
 from cli.data_masking.configure_data_masking_macro_properties_provider import (
     get_configure_data_masking_macro_properties,
 )
-from cli.databricks_exceptions import (
-    WorkspaceNameNotProvidedException,
-    CatalogNameNotProvidedException,
-)
 from cli.exceptions import (
-    MultipleDatabaseNamesException,
     SQLEngineNotSupportedException,
+    OverridingSchemaNameNotSupportedException,
 )
 from cli.model import ManifestNode, ModelType, ConfigureMacroProperties
 
@@ -122,13 +118,6 @@ def _get_manifest_nodes_eligible_for_configuration(
     return result
 
 
-def _get_database_name(manifest_nodes: List[ManifestNode], database_name: str = None):
-    db_name_from_manifest_file = {n.database_name for n in manifest_nodes}
-    if len(db_name_from_manifest_file) > 1:
-        raise MultipleDatabaseNamesException(db_name_from_manifest_file)
-    return database_name if database_name else list(db_name_from_manifest_file)[0]
-
-
 def _invoke_compile_command(target: str = None, variables: str = None) -> None:
     click.echo("Compiling project...")
     cmd = ["compile"]
@@ -162,6 +151,8 @@ def run_configure_macro(
             "config_access_management_table_name": configure_properties.config_table_name,
             "create_temp_access_management_config_table_query": configure_properties.create_temp_config_table_query,
             "create_access_management_config_table_query": configure_properties.create_config_table_query,
+            "access_management_database_name": configure_properties.database_name,
+            "access_management_schema_name": configure_properties.schema_name,
         }
 
     def prepare_data_masking_args(
@@ -172,6 +163,8 @@ def run_configure_macro(
             "config_data_masking_table_name": configure_properties.config_table_name,
             "create_temp_data_masking_config_table_query": configure_properties.create_temp_config_table_query,
             "create_data_masking_config_table_query": configure_properties.create_config_table_query,
+            "access_management_database_name": configure_properties.database_name,
+            "access_management_schema_name": configure_properties.schema_name,
         }
 
     def run_dbt_operation(operation_name: str, args: dict) -> None:
@@ -254,6 +247,26 @@ def cli():
     default=True,
 )
 @click.option(
+    "--database-name",
+    help="Database name for storing access management configuration. "
+    "WARNING: Library not work correctly in Redshift when models are "
+    "configured across multiple databases within a single dbt project. "
+    "Due to that make sure that on Redshift this parameter always has same "
+    "name as database on which you are executing access management configuration! "
+    "Multi database support will be added in next releases.",
+    type=str,
+    required=True,
+)
+@click.option(
+    "--schema-name",
+    help="Schema name for storing access management configuration,`access_management` by default. "
+    "WARNING: Overriding schema-name won't work in Redshift in current version of library. "
+    "Possibility for overriding schema name in Redshift will be added in next releases",
+    type=str,
+    required=True,
+    default=DEFAULT_SCHEMA_NAME,
+)
+@click.option(
     "--access-management-config-file-path",
     help="Path to the access management config file.",
     type=str,
@@ -265,39 +278,20 @@ def cli():
     type=str,
     default="data_masking.yml",
 )
-@click.option(
-    "--database-name",
-    help="Database name for which you want to configure access management. "
-    "It it required to specify database name in Redshift"
-    "multi project setup (for example using meshify or dbt-loom)",
-    type=str,
-)
-@click.option(
-    "--workspace-name",
-    help="Workspace name for which you want to configure access management. "
-    "It it required databricks parameter",
-    type=str,
-)
-@click.option(
-    "--catalog-name",
-    help="Catalog to store access management configuration. It it required databricks parameter",
-    type=str,
-)
 def configure(
     dbt_command: str,
     configure_access_management: bool,
     configure_data_masking: bool,
+    database_name: str,
+    schema_name: str,
     access_management_config_file_path: str,
     data_masking_config_file_path: str,
-    database_name: str = None,
-    workspace_name: str = None,
-    catalog_name: str = None,
 ):
     command_list = _get_command_list(dbt_command)
     target = _get_target(command_list)
     variables = _get_variables(command_list)
 
-    _invoke_compile_command(target, variables)
+    # _invoke_compile_command(target, variables)
 
     manifest = load_manifest()
     project_name = manifest.metadata.project_name
@@ -305,23 +299,12 @@ def configure(
     if sql_engine.lower() not in SUPPORTED_SQL_ENGINES:
         raise SQLEngineNotSupportedException()
 
+    if sql_engine == SQLEngine.REDSHIFT and schema_name != DEFAULT_SCHEMA_NAME:
+        raise OverridingSchemaNameNotSupportedException()
+
     manifest_nodes = _get_manifest_nodes_eligible_for_configuration(
         manifest, project_name
     )
-    if sql_engine == SQLEngine.REDSHIFT:
-        environment_name = _get_database_name(manifest_nodes, database_name)
-        click.echo(
-            f"Running dbt-access-management configurations on {environment_name} database..."
-        )
-    if sql_engine == SQLEngine.DATABRICKS:
-        if not workspace_name:
-            raise WorkspaceNameNotProvidedException()
-        if not catalog_name:
-            raise CatalogNameNotProvidedException()
-        environment_name = workspace_name
-        click.echo(
-            f"Running dbt-access-management configurations on {environment_name} workspace..."
-        )
 
     configure_access_management_macro_properties = (
         (
@@ -329,9 +312,9 @@ def configure(
                 manifest_nodes=manifest_nodes,
                 config_file_path=access_management_config_file_path,
                 sql_engine=sql_engine,
-                environment_name=environment_name,
                 project_name=project_name,
-                catalog_name=catalog_name,
+                database_name=database_name,
+                schema_name=schema_name,
             )
         )
         if configure_access_management
@@ -344,6 +327,8 @@ def configure(
                 manifest_nodes=manifest_nodes,
                 config_file_path=data_masking_config_file_path,
                 project_name=project_name,
+                database_name=database_name,
+                schema_name=schema_name,
             )
         )
         if configure_data_masking

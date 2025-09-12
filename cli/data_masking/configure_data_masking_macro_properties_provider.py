@@ -78,6 +78,8 @@ def get_configure_data_masking_macro_properties(
     manifest_nodes: List[ManifestNode],
     config_file_path: str,
     project_name: str,
+    database_name: str,
+    schema_name: str,
 ) -> ConfigureMacroProperties:
     config_file_data = _read_config_file(config_file_path)
     data_masking_config = parse_data_masking_config(config_file_data)
@@ -104,4 +106,6 @@ def get_configure_data_masking_macro_properties(
         config_table_name=config_data_masking_table_name,
         create_temp_config_table_query=create_temp_data_masking_config_table_query,
         create_config_table_query=create_data_masking_config_table_query,
+        database_name=database_name,
+        schema_name=schema_name,
     )

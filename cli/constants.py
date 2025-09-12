@@ -8,3 +8,5 @@ class SQLEngine(str, Enum):
 
 
 SUPPORTED_SQL_ENGINES: List[SQLEngine] = [SQLEngine.REDSHIFT, SQLEngine.DATABRICKS]
+
+DEFAULT_SCHEMA_NAME = "access_management"

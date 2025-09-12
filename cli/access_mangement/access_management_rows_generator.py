@@ -4,12 +4,12 @@ from pydantic import BaseModel
 
 from cli.access_mangement.access_management_config_parser import (
     IdentityType,
-    DataBaseAccessConfig,
     AccessLevel,
     AccessConfigIdentity,
+    AccessManagementConfig,
 )
 from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine
-from cli.databricks_exceptions import NotSupportedMaterializationException
+from cli.exceptions import NotSupportedMaterializationException
 from cli.model import ManifestNode, ModelType
 
 
@@ -27,7 +27,7 @@ class AccessManagementRow(BaseModel):
 
 
 def generate_access_management_rows(
-    data_base_access_config: DataBaseAccessConfig,
+    config: AccessManagementConfig,
     manifest_nodes: List[ManifestNode],
     project_name: str,
     sql_engine: str,
@@ -39,7 +39,7 @@ def generate_access_management_rows(
     access_management_rows = []
 
     for node in manifest_nodes:
-        for identity in data_base_access_config.access_config_identities:
+        for identity in config.access_config_identities:
             grants_per_node = set()
             revokes_per_node = set()
 
@@ -256,22 +256,27 @@ def _get_grant_statements_databricks(
     )
     if access_level == AccessLevel.READ:
         grants.add(
-            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"TO `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.WRITE:
         grants.add(
-            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"TO `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.READ_WRITE:
         grants.add(
-            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+            f"GRANT SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"TO `{identity.identity_name}`;"
         )
         grants.add(
-            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+            f"GRANT MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"TO `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.ALL:
         grants.add(
-            f"GRANT ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} TO `{identity.identity_name}`;"
+            f"GRANT ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"TO `{identity.identity_name}`;"
         )
     return grants
 
@@ -289,21 +294,26 @@ def _get_revoke_statements_databricks(
 
     if access_level == AccessLevel.READ:
         revokes.add(
-            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"FROM `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.WRITE:
         revokes.add(
-            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"FROM `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.READ_WRITE:
         revokes.add(
-            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+            f"REVOKE SELECT ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"FROM `{identity.identity_name}`;"
         )
         revokes.add(
-            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+            f"REVOKE MODIFY ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"FROM `{identity.identity_name}`;"
         )
     if access_level == AccessLevel.ALL:
         revokes.add(
-            f"REVOKE ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} FROM `{identity.identity_name}`;"
+            f"REVOKE ALL PRIVILEGES ON {securable_object_type} {node.database_name}.{node.schema_name}.{node.alias} "
+            f"FROM `{identity.identity_name}`;"
         )
     return revokes

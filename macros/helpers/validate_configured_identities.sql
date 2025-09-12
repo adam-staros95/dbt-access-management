@@ -1,14 +1,14 @@
-{% macro validate_configured_identities(config_table_name, should_stop_execution=True) %}
+{% macro validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution=True) %}
     {{ adapter.dispatch('validate_configured_identities')(config_table_name, should_stop_execution) }}
 {% endmacro %}
 
-{% macro redshift__validate_configured_identities(config_table_name, should_stop_execution) %}
+{% macro redshift__validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution) %}
     {% if execute %}
         {% set database_identities = get_database_identities() %}
 
         {% set query_config_table_identities %}
             SELECT identity_name AS identity_name, identity_type AS identity_type
-            FROM access_management.{{config_table_name}};
+            FROM {{database_name}}.{{schema_name}}.{{config_table_name}};
         {% endset %}
 
         {% set query_config_table_identities_result = dbt.run_query(query_config_table_identities) %}
@@ -48,6 +48,6 @@
     {{ return(identity_strings) }}
 {% endmacro %}
 
-{% macro databricks__validate_configured_identities(config_table_name, should_stop_execution) %}
-    {{ log("SKIPPING databricks__validate_configured_identities", info=True) }}
+{% macro databricks__validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution) %}
+    {% if execute %} {% endif %}
 {% endmacro %}

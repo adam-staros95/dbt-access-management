@@ -1,3 +1,10 @@
-{% macro databricks__configure_data_masking(temp_data_masking_config_table_name, config_data_masking_table_name, create_temp_data_masking_config_table_query, create_data_masking_config_table_query) %}
+{% macro databricks__configure_data_masking(
+     temp_data_masking_config_table_name,
+     config_data_masking_table_name,
+     create_temp_data_masking_config_table_query,
+     create_data_masking_config_table_query,
+     access_management_database_name,
+     access_management_schema_name
+    ) %}
     {{ log("SKIPPING databricks__configure_data_masking", info=True) }}
 {% endmacro %}

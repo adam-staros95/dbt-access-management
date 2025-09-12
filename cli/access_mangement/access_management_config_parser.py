@@ -23,13 +23,8 @@ class AccessConfigIdentity(BaseModel):
     config_paths: List[Tuple[str, AccessLevel]]
 
 
-class DataBaseAccessConfig(BaseModel):
-    database_name: str
-    access_config_identities: List[AccessConfigIdentity]
-
-
 class AccessManagementConfig(BaseModel):
-    databases_access_config: List[DataBaseAccessConfig]
+    access_config_identities: List[AccessConfigIdentity]
 
 
 def _extract_configs(
@@ -47,48 +42,39 @@ def _extract_configs(
 
 
 def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConfig:
-    databases = data["databases"] if "databases" in data else data["workspaces"]
-    databases_access_config = []
+    config = data["configuration"]
 
-    for database_name, entities in databases.items():
-        users_config = entities.get("users", {})
-        roles_config = entities.get("roles", {})
-        groups_config = entities.get("groups", {})
+    users_config = config.get("users", {})
+    roles_config = config.get("roles", {})
+    groups_config = config.get("groups", {})
 
-        users_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_configs(config, "/"),
-                identity_type=IdentityType.USER,
-            )
-            for identity_name, config in users_config.items()
-        ]
-
-        roles_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_configs(config, "/"),
-                identity_type=IdentityType.ROLE,
-            )
-            for identity_name, config in roles_config.items()
-        ]
-
-        groups_entities = [
-            AccessConfigIdentity(
-                identity_name=identity_name,
-                config_paths=_extract_configs(config, "/"),
-                identity_type=IdentityType.GROUP,
-            )
-            for identity_name, config in groups_config.items()
-        ]
-
-        databases_access_config.append(
-            DataBaseAccessConfig(
-                database_name=database_name,
-                access_config_identities=users_entities
-                + roles_entities
-                + groups_entities,
-            )
+    users_entities = [
+        AccessConfigIdentity(
+            identity_name=identity_name,
+            config_paths=_extract_configs(config, "/"),
+            identity_type=IdentityType.USER,
         )
+        for identity_name, config in users_config.items()
+    ]
 
-    return AccessManagementConfig(databases_access_config=databases_access_config)
+    roles_entities = [
+        AccessConfigIdentity(
+            identity_name=identity_name,
+            config_paths=_extract_configs(config, "/"),
+            identity_type=IdentityType.ROLE,
+        )
+        for identity_name, config in roles_config.items()
+    ]
+
+    groups_entities = [
+        AccessConfigIdentity(
+            identity_name=identity_name,
+            config_paths=_extract_configs(config, "/"),
+            identity_type=IdentityType.GROUP,
+        )
+        for identity_name, config in groups_config.items()
+    ]
+
+    return AccessManagementConfig(
+        access_config_identities=users_entities + roles_entities + groups_entities,
+    )

@@ -8,7 +8,6 @@ import yaml
 
 from cli.access_mangement.access_management_config_parser import (
     parse_access_management_config,
-    AccessManagementConfig,
 )
 from cli.access_mangement.access_management_rows_generator import (
     generate_access_management_rows,
@@ -16,9 +15,6 @@ from cli.access_mangement.access_management_rows_generator import (
 )
 from cli.constants import SQLEngine
 from cli.exceptions import AccessManagementConfigFileNotFoundException
-from cli.exceptions import (
-    DatabaseAccessManagementConfigNotExistsException,
-)
 from cli.model import ConfigureMacroProperties, ManifestNode
 
 
@@ -32,29 +28,18 @@ def _read_config_file(config_file_path: str) -> Dict[str, Any]:
         return yaml.safe_load(file)
 
 
-def _get_access_management_rows(
-    manifest_nodes: List[ManifestNode],
-    access_management_config: AccessManagementConfig,
-    project_name: str,
-    sql_engine: str,
-    environment_name: str = None,
-) -> List[AccessManagementRow]:
-    for database_access_config in access_management_config.databases_access_config:
-        if database_access_config.database_name == environment_name:
-            return generate_access_management_rows(
-                database_access_config, manifest_nodes, project_name, sql_engine
-            )
-    raise DatabaseAccessManagementConfigNotExistsException(environment_name)
-
-
 def _build_create_access_management_config_table_sql_redshift(
-    rows: List[AccessManagementRow], table_name: str
+    rows: List[AccessManagementRow],
+    database_name: str,
+    schema_name: str,
+    table_name: str,
 ) -> str:
+    table_location = f"{database_name}.{schema_name}"
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     create_table_sql = f"""
 BEGIN;
-CREATE SCHEMA IF NOT EXISTS access_management;
-CREATE TABLE IF NOT EXISTS access_management.{table_name} (
+CREATE SCHEMA IF NOT EXISTS {table_location};
+CREATE TABLE IF NOT EXISTS {table_location}.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
@@ -70,8 +55,9 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
     """
     if rows:
         create_table_sql += f"""
-        INSERT INTO access_management.{table_name}
-        (project_name, database_name, schema_name, alias, model_name, materialization, identity_type, identity_name, grants, revokes, created_timestamp)
+        INSERT INTO {table_location}.{table_name}
+        (project_name, database_name, schema_name, alias, model_name, materialization,
+        identity_type, identity_name, grants, revokes, created_timestamp)
         VALUES
         """
 
@@ -97,7 +83,7 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         create_table_sql += ",\n".join(values) + ";"
 
     create_table_sql += (
-        f"DELETE FROM access_management.{table_name} "
+        f"DELETE FROM {table_location}.{table_name} "
         f"WHERE created_timestamp < TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS');"
     )
     create_table_sql += "\nCOMMIT;"
@@ -106,12 +92,13 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
 
 
 def _build_create_access_management_config_table_sql_databricks(
-    rows: List[AccessManagementRow], table_name: str, catalog_name: str = None
+    rows: List[AccessManagementRow],
+    database_name: str,
+    schema_name: str,
+    table_name: str,
 ) -> str:
+    table_location = f"{database_name}.{schema_name}"
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    table_location = (
-        f"{catalog_name}.access_management" if catalog_name else "access_management"
-    )
     create_table_sql = f"""
 BEGIN
 CREATE SCHEMA IF NOT EXISTS {table_location};
@@ -132,7 +119,8 @@ CREATE OR REPLACE TABLE {table_location}.{table_name} (
     if rows:
         create_table_sql += f"""
         INSERT INTO {table_location}.{table_name}
-        (project_name, database_name, schema_name, alias, model_name, materialization, identity_type, identity_name, grants, revokes, created_timestamp)
+        (project_name, database_name, schema_name, alias, model_name, materialization,
+        identity_type, identity_name, grants, revokes, created_timestamp)
         VALUES
         """
 
@@ -164,18 +152,14 @@ def get_configure_access_management_macro_properties(
     manifest_nodes: List[ManifestNode],
     config_file_path: str,
     sql_engine: str,
-    environment_name: str,
     project_name: str,
-    catalog_name: str = None,
+    database_name: str,
+    schema_name: str,
 ) -> ConfigureMacroProperties:
     config_file_data = _read_config_file(config_file_path)
     access_management_config = parse_access_management_config(config_file_data)
-    access_management_rows = _get_access_management_rows(
-        manifest_nodes,
-        access_management_config,
-        project_name,
-        sql_engine,
-        environment_name,
+    access_management_rows = generate_access_management_rows(
+        access_management_config, manifest_nodes, project_name, sql_engine
     )
 
     temp_access_management_config_table_name = (
@@ -185,22 +169,32 @@ def get_configure_access_management_macro_properties(
 
     create_temp_access_management_config_table_query = (
         _build_create_access_management_config_table_sql_redshift(
-            access_management_rows, temp_access_management_config_table_name
+            access_management_rows,
+            database_name,
+            schema_name,
+            temp_access_management_config_table_name,
         )
         if sql_engine == SQLEngine.REDSHIFT
         else _build_create_access_management_config_table_sql_databricks(
             access_management_rows,
+            database_name,
+            schema_name,
             temp_access_management_config_table_name,
-            catalog_name,
         )
     )
     create_access_management_config_table_query = (
         _build_create_access_management_config_table_sql_redshift(
-            access_management_rows, config_access_management_table_name
+            access_management_rows,
+            database_name,
+            schema_name,
+            config_access_management_table_name,
         )
         if sql_engine == SQLEngine.REDSHIFT
         else _build_create_access_management_config_table_sql_databricks(
-            access_management_rows, config_access_management_table_name, catalog_name
+            access_management_rows,
+            database_name,
+            schema_name,
+            config_access_management_table_name,
         )
     )
 
@@ -209,4 +203,6 @@ def get_configure_access_management_macro_properties(
         config_table_name=config_access_management_table_name,
         create_temp_config_table_query=create_temp_access_management_config_table_query,
         create_config_table_query=create_access_management_config_table_query,
+        database_name=database_name,
+        schema_name=schema_name,
     )

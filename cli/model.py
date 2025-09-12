@@ -25,3 +25,5 @@ class ConfigureMacroProperties(BaseModel):
     config_table_name: str
     create_temp_config_table_query: str
     create_config_table_query: str
+    database_name: str
+    schema_name: str
