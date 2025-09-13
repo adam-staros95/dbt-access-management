@@ -290,7 +290,7 @@ def configure(
     command_list = _get_command_list(dbt_command)
     target = _get_target(command_list)
     variables = _get_variables(command_list)
-
+    # TODO: Uncomment
     # _invoke_compile_command(target, variables)
 
     manifest = load_manifest()
@@ -341,8 +341,8 @@ def configure(
         target=target,
         variables=variables,
     )
-
-    _invoke_passed_dbt_command(command_list)
+    # TODO: Uncomment
+    # _invoke_passed_dbt_command(command_list)
 
 
 cli.add_command(configure)
