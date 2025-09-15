@@ -36,17 +36,12 @@
     {% set should_drop_configuration_table = check_should_drop_configuration_table('access_management', temp_access_management_config_table_name, config_access_management_table_name) %}
     {% if should_drop_configuration_table %}
         {% set drop_configuration_table_query %}
-            DROP TABLE access_management.{{config_access_management_table_name}};
+            DROP TABLE {{access_management_database_name}}.{{access_management_schema_name}}.{{config_access_management_table_name}};
         {% endset %}
         {% do run_query(drop_configuration_table_query) %}
     {% endif %}
     {% do run_query(create_access_management_config_table_query) %}
-    {% set drop_temp_config_access_management_table_query %}
-        DROP TABLE access_management.{{temp_access_management_config_table_name}};
-    {% endset %}
-    {{ log(drop_temp_config_access_management_table_query, info=True) }}
-    {% do run_query(drop_temp_config_access_management_table_query) %}
-
+    {% do drop_temp_config_table(database_name=access_management_database_name, schema_name=access_management_schema_name, temp_config_table_name=temp_access_management_config_table_name) %}
 {% endmacro %}
 
 {% macro get_grants_and_revokes(objects_in_database, config_access_management_table_name, database_identities, should_check_if_config_table_exits=True) %}
