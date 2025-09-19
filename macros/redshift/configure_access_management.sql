@@ -9,7 +9,9 @@
     {{ log("Creating temporary access config table " ~ temp_access_management_config_table_name, info=True) }}
     {% do run_query(create_temp_access_management_config_table_query) %}
     {% do validate_configured_identities(database_name=access_management_database_name, schema_name=access_management_schema_name, config_table_name=temp_access_management_config_table_name, should_stop_execution=True) %}
-    {% set objects_in_database = get_objects_in_database() %}
+    -- TODO: Add redshift support for multiple databases; Implement
+    -- `get_all_databases_used_in_project`
+    {% set objects_in_database = get_objects_in_databases() %}
     {% set database_identities = get_database_identities() %}
     {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_access_management_config_table_name, database_identities) %}
     {% set new_unique_grants = new_unique_grants_and_revokes['unique_grants'] %}
@@ -44,6 +46,8 @@
     {% do drop_temp_config_table(database_name=access_management_database_name, schema_name=access_management_schema_name, temp_config_table_name=temp_access_management_config_table_name) %}
 {% endmacro %}
 
+-- TODO: Add redshift support for multiple databases; Check if comparing object type
+-- is necessary
 {% macro get_grants_and_revokes(objects_in_database, config_access_management_table_name, database_identities, should_check_if_config_table_exits=True) %}
     {% set unique_grants = [] %}
     {% set unique_revokes = [] %}

@@ -10,19 +10,19 @@
     {% do run_query(create_temp_access_management_config_table_query) %}
     {% do validate_configured_identities(database_name=access_management_database_name, schema_name=access_management_schema_name, config_table_name=temp_access_management_config_table_name, should_stop_execution=True) %}
 
-    {% set all_databases = get_all_configured_databases(
+    {% set databases_used_in_project = get_all_databases_used_in_project(
         database_name=access_management_database_name,
         schema_name=access_management_schema_name,
         config_table_name=config_access_management_table_name,
         temp_config_table_name=temp_access_management_config_table_name
     ) %}
-
-    {{ log("All configured databases: " ~ all_databases | join(", "), info=True) }}
+    -- TODO: Check if information about materialization is required
+    {% set objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
     {% do run_query(create_access_management_config_table_query) %}
     {% do drop_temp_config_table(database_name=access_management_database_name, schema_name=access_management_schema_name, temp_config_table_name=temp_access_management_config_table_name) %}
 {% endmacro %}
 
-{% macro get_all_configured_databases(database_name, schema_name, config_table_name, temp_config_table_name) %}
+{% macro get_all_databases_used_in_project(database_name, schema_name, config_table_name, temp_config_table_name) %}
     {% set databases_configured_in_config_table = get_configured_databases(
         database_name=database_name,
         schema_name=schema_name,

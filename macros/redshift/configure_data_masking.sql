@@ -13,7 +13,9 @@
     {% do run_query(create_temp_data_masking_config_table_query) %}
 
     {% do create_project_related_masking_policies() %}
-    {% set objects_in_database = get_objects_in_database() %}
+    -- TODO: Add redshift support for multiple databases; Implement
+    -- get_all_databases_used_in_project
+    {% set objects_in_database = get_objects_in_databases() %}
     {% set database_identities = get_database_identities() %}
     {% set currently_applied_masking_configs = get_currently_applied_masking_configs_for_objects_from_new_config(temp_data_masking_config_table_name) %}
     {% set new_masking_configs = get_new_masking_configs(temp_data_masking_config_table_name, objects_in_database) %}
