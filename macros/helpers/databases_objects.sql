@@ -1,5 +1,5 @@
 {% macro get_objects_in_databases(databases=None) %}
-    {{ adapter.dispatch('get_objects_in_databases')(databases) }}
+    {{ return (adapter.dispatch('get_objects_in_databases')(databases)) }}
 {% endmacro %}
 
 -- TODO: Add redshift support for multiple databases; Implement iteration over databases

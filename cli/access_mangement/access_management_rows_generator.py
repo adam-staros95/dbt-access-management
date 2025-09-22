@@ -249,10 +249,10 @@ def _get_grant_statements_databricks(
     )
 
     grants.add(
-        f"GRANT USE CATALOG ON CATALOG {node.database_name} TO `{identity.identity_name}`"
+        f"GRANT USE CATALOG ON CATALOG {node.database_name} TO `{identity.identity_name}`;"
     )
     grants.add(
-        f"GRANT USE SCHEMA ON SCHEMA {node.database_name}.{node.schema_name} TO `{identity.identity_name}`"
+        f"GRANT USE SCHEMA ON SCHEMA {node.database_name}.{node.schema_name} TO `{identity.identity_name}`;"
     )
     if access_level == AccessLevel.READ:
         grants.add(
