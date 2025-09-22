@@ -42,39 +42,25 @@ def _extract_configs(
 
 
 def parse_access_management_config(data: Dict[str, Any]) -> AccessManagementConfig:
-    config = data["configuration"]
+    raw_config = data.get("configuration", {})
+    config = raw_config if isinstance(raw_config, dict) else {}
 
-    users_config = config.get("users", {})
-    roles_config = config.get("roles", {})
-    groups_config = config.get("groups", {})
+    identity_map = {
+        "users": IdentityType.USER,
+        "roles": IdentityType.ROLE,
+        "groups": IdentityType.GROUP,
+    }
 
-    users_entities = [
-        AccessConfigIdentity(
-            identity_name=identity_name,
-            config_paths=_extract_configs(config, "/"),
-            identity_type=IdentityType.USER,
-        )
-        for identity_name, config in users_config.items()
-    ]
+    access_entities: List[AccessConfigIdentity] = []
 
-    roles_entities = [
-        AccessConfigIdentity(
-            identity_name=identity_name,
-            config_paths=_extract_configs(config, "/"),
-            identity_type=IdentityType.ROLE,
-        )
-        for identity_name, config in roles_config.items()
-    ]
+    for key, identity_type in identity_map.items():
+        for identity_name, identity_config in config.get(key, {}).items():
+            access_entities.append(
+                AccessConfigIdentity(
+                    identity_name=identity_name,
+                    config_paths=_extract_configs(identity_config, "/"),
+                    identity_type=identity_type,
+                )
+            )
 
-    groups_entities = [
-        AccessConfigIdentity(
-            identity_name=identity_name,
-            config_paths=_extract_configs(config, "/"),
-            identity_type=IdentityType.GROUP,
-        )
-        for identity_name, config in groups_config.items()
-    ]
-
-    return AccessManagementConfig(
-        access_config_identities=users_entities + roles_entities + groups_entities,
-    )
+    return AccessManagementConfig(access_config_identities=access_entities)

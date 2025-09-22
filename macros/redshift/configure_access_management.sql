@@ -13,15 +13,17 @@
     -- `get_all_databases_used_in_project`
     {% set objects_in_database = get_objects_in_databases() %}
     {% set database_identities = get_database_identities() %}
+
     {% set new_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, temp_access_management_config_table_name, database_identities) %}
     {% set new_unique_grants = new_unique_grants_and_revokes['unique_grants'] %}
     {% set new_unique_revokes = new_unique_grants_and_revokes['unique_revokes'] %}
+
     {% set previous_unique_grants_and_revokes = get_grants_and_revokes(objects_in_database, config_access_management_table_name, database_identities, True) %}
     {% set previous_unique_grants = previous_unique_grants_and_revokes['unique_grants'] %}
     {% set previous_unique_revokes = previous_unique_grants_and_revokes['unique_revokes'] %}
 
-    {% set revokes_to_execute = get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
-    {% set grants_to_execute = get_new_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
+    {% set revokes_to_execute = get_previous_unique_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
+    {% set grants_to_execute = get_new_unique_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
 
     {% if (revokes_to_execute | length) > 0 or (grants_to_execute | length) > 0 %}
         {% set execute_revokes_and_grants_query %}
@@ -114,26 +116,4 @@
     } %}
         {{ return(result) }}
     {% endif %}
-{% endmacro %}
-
-{% macro get_previous_revokes_which_do_not_exist_in_new_config(new_unique_revokes, previous_unique_revokes) %}
-    {% set revokes_to_execute = [] %}
-    {% for revoke in previous_unique_revokes %}
-        {% if revoke not in new_unique_revokes %}
-            {% do revokes_to_execute.append(revoke) %}
-        {% endif %}
-    {% endfor %}
-
-    {{ return(revokes_to_execute) }}
-{% endmacro %}
-
-{% macro get_new_grants_which_do_not_exist_in_previous_config(new_unique_grants, previous_unique_grants) %}
-    {% set grants_to_execute = [] %}
-    {% for grant in new_unique_grants %}
-        {% if grant not in previous_unique_grants %}
-            {% do grants_to_execute.append(grant) %}
-        {% endif %}
-    {% endfor %}
-
-    {{ return(grants_to_execute) }}
 {% endmacro %}
