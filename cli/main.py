@@ -326,6 +326,7 @@ def configure(
             get_configure_data_masking_macro_properties(
                 manifest_nodes=manifest_nodes,
                 config_file_path=data_masking_config_file_path,
+                sql_engine=sql_engine,
                 project_name=project_name,
                 database_name=database_name,
                 schema_name=schema_name,

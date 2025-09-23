@@ -9,11 +9,12 @@
     {% set detach_policies_query = '' %}
     {% set attach_policies_query = '' %}
 
-    {{ log("Creating temporary dynamic data masking config table " ~ temp_data_masking_config_table_name, info=True) }}
+    {{ log("Creating temporary data masking config table " ~ temp_data_masking_config_table_name, info=True) }}
     {% do run_query(create_temp_data_masking_config_table_query) %}
 
     {% do create_project_related_masking_policies() %}
     -- TODO: Add redshift support for multiple databases; Implement
+    -- TODO: Implement validate_configured_identities for data masking
     -- get_all_databases_used_in_project
     {% set objects_in_database = get_objects_in_databases() %}
     {% set database_identities = get_database_identities() %}

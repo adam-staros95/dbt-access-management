@@ -6,6 +6,7 @@ from typing import List, Any, Dict
 
 import yaml
 
+from cli.constants import SQLEngine
 from cli.data_masking.data_masking_config_parser import parse_data_masking_config
 from cli.data_masking.data_masking_rows_generator import (
     generate_data_masking_rows,
@@ -25,17 +26,22 @@ def _read_config_file(config_file_path: str) -> Dict[str, Any]:
         return yaml.safe_load(file)
 
 
-def _build_create_data_masking_config_table_sql(
-    rows: List[DataMaskingRow], table_name: str, project_name: str
+def _build_create_data_masking_config_table_sql_redshift(
+    rows: List[DataMaskingRow],
+    database_name: str,
+    schema_name: str,
+    table_name: str,
 ) -> str:
+    table_location = f"{database_name}.{schema_name}"
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     create_table_sql = f"""
 BEGIN;
-CREATE SCHEMA IF NOT EXISTS access_management;
-CREATE TABLE IF NOT EXISTS access_management.{table_name} (
+CREATE SCHEMA IF NOT EXISTS {table_location};
+CREATE TABLE IF NOT EXISTS {table_location}.{table_name} (
         project_name TEXT,
         database_name TEXT,
         schema_name TEXT,
+        alias TEXT,
         model_name TEXT,
         materialization TEXT,
         masking_config SUPER,
@@ -45,8 +51,8 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
 
     if rows:
         create_table_sql += f"""
-        INSERT INTO access_management.{table_name}
-        (project_name, database_name, schema_name, model_name, materialization, masking_config, created_timestamp)
+        INSERT INTO {table_location}.{table_name}
+        (project_name, database_name, schema_name, alias, model_name, materialization, masking_config, created_timestamp)
         VALUES
         """
 
@@ -54,9 +60,10 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
         for row in rows:
             masking_config = json.dumps(list(row.masking_config)).replace("'", "''")
             value = (
-                f"('{project_name}', "
+                f"('{row.project_name}', "
                 f"'{row.database_name}', "
                 f"'{row.schema_name}', "
+                f"'{row.alias}', "
                 f"'{row.model_name}', "
                 f"'{row.materialization}', "
                 f"JSON_PARSE('{masking_config}'), "
@@ -66,7 +73,7 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
 
         create_table_sql += ",\n".join(values) + ";"
     create_table_sql += (
-        f"DELETE FROM access_management.{table_name} "
+        f"DELETE FROM {table_location}.{table_name} "
         f"WHERE created_timestamp < TO_TIMESTAMP('{current_timestamp}', 'YYYY-MM-DD HH24:MI:SS');"
     )
     create_table_sql += "\nCOMMIT;"
@@ -74,36 +81,113 @@ CREATE TABLE IF NOT EXISTS access_management.{table_name} (
     return create_table_sql
 
 
+def _build_create_data_masking_config_table_sql_databricks(
+    rows: List[DataMaskingRow],
+    database_name: str,
+    schema_name: str,
+    table_name: str,
+) -> str:
+    table_location = f"{database_name}.{schema_name}"
+    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    create_table_sql = f"""
+BEGIN
+CREATE SCHEMA IF NOT EXISTS {table_location};
+CREATE OR REPLACE TABLE {table_location}.{table_name} (
+        project_name STRING,
+        database_name STRING,
+        schema_name STRING,
+        alias STRING,
+        model_name STRING,
+        materialization STRING,
+        masking_config STRING,
+        created_timestamp TIMESTAMP
+    );
+    """
+
+    if rows:
+        create_table_sql += f"""
+        INSERT INTO {table_location}.{table_name}
+        (project_name, database_name, schema_name, alias, model_name, materialization, masking_config, created_timestamp)
+        VALUES
+        """
+
+        values = []
+        for row in rows:
+            masking_config = json.dumps(list(row.masking_config)).replace("'", "''")
+            value = (
+                f"('{row.project_name}', "
+                f"'{row.database_name}', "
+                f"'{row.schema_name}', "
+                f"'{row.alias}', "
+                f"'{row.model_name}', "
+                f"'{row.materialization}', "
+                f"'{masking_config}', "
+                f"TO_TIMESTAMP('{current_timestamp}', 'yyyy-MM-dd HH:mm:ss'))"
+            )
+            values.append(value)
+
+        create_table_sql += ",\n".join(values) + ";"
+    create_table_sql += "\n END;"
+    return create_table_sql
+
+
 def get_configure_data_masking_macro_properties(
     manifest_nodes: List[ManifestNode],
     config_file_path: str,
+    sql_engine: str,
     project_name: str,
     database_name: str,
     schema_name: str,
 ) -> ConfigureMacroProperties:
     config_file_data = _read_config_file(config_file_path)
     data_masking_config = parse_data_masking_config(config_file_data)
-    data_masking_rows = generate_data_masking_rows(data_masking_config, manifest_nodes)
+    data_masking_rows = generate_data_masking_rows(
+        data_masking_config, manifest_nodes, project_name, sql_engine
+    )
 
     temp_data_masking_config_table_name = (
         f"temp_{project_name}_{int(time.time())}_data_masking_config"
     )
-    config_data_masking_table_name = f"{project_name}_data_masking_config"
+    data_masking_config_table_name = f"{project_name}_data_masking_config"
 
     create_temp_data_masking_config_table_query = (
-        _build_create_data_masking_config_table_sql(
-            data_masking_rows, temp_data_masking_config_table_name, project_name
+        _build_create_data_masking_config_table_sql_redshift(
+            data_masking_rows,
+            database_name,
+            schema_name,
+            temp_data_masking_config_table_name,
+        )
+        if sql_engine == SQLEngine.REDSHIFT
+        else (
+            _build_create_data_masking_config_table_sql_databricks(
+                data_masking_rows,
+                database_name,
+                schema_name,
+                temp_data_masking_config_table_name,
+            )
         )
     )
     create_data_masking_config_table_query = (
-        _build_create_data_masking_config_table_sql(
-            data_masking_rows, config_data_masking_table_name, project_name
+        _build_create_data_masking_config_table_sql_redshift(
+            data_masking_rows,
+            database_name,
+            schema_name,
+            data_masking_config_table_name,
+        )
+        if sql_engine == SQLEngine.REDSHIFT
+        else (
+            _build_create_data_masking_config_table_sql_databricks(
+                data_masking_rows,
+                database_name,
+                schema_name,
+                data_masking_config_table_name,
+            )
         )
     )
 
     return ConfigureMacroProperties(
         temp_config_table_name=temp_data_masking_config_table_name,
-        config_table_name=config_data_masking_table_name,
+        config_table_name=data_masking_config_table_name,
         create_temp_config_table_query=create_temp_data_masking_config_table_query,
         create_config_table_query=create_data_masking_config_table_query,
         database_name=database_name,

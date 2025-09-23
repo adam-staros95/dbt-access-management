@@ -7,6 +7,7 @@ class ColumnMaskingConfig(BaseModel):
     column_name: str
     users_with_access: List[str]
     roles_with_access: List[str]
+    groups_with_access: List[str]
 
 
 class ModelDataMaskingConfig(BaseModel):
@@ -27,6 +28,7 @@ def _parse_columns_config(columns_config: List[Dict]) -> List[ColumnMaskingConfi
                     column_name=column_name,
                     users_with_access=masking_config.get("users_with_access", []),
                     roles_with_access=masking_config.get("roles_with_access", []),
+                    groups_with_access=masking_config.get("groups_with_access", []),
                 )
             )
     return columns_masking_config
