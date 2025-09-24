@@ -33,6 +33,25 @@
         should_check_table_exists=True
     ) %}
 
+    {% set diff = diff_masking_configs(new_masking_configs=new_masking_configs, previous_masking_configs=previous_masking_configs) %}
+    {% set deleted = diff['deleted'] %}
+    {% set added_or_updated = diff['added_or_updated'] %}
+
+    {% set statements_for_deleted_configs = get_statements_for_deleted_configs(diff['deleted'], access_management_database_name, access_management_schema_name) %}
+    {% set statements_for_added_or_updated_configs = get_statements_for_added_or_updated_configs(diff['added_or_updated'], access_management_database_name, access_management_schema_name) %}
+
+    {% if (statements_for_deleted_configs | length) > 0 or (statements_for_added_or_updated_configs | length) > 0 %}
+        {% set query %}
+            BEGIN
+            {{statements_for_deleted_configs | join('\n')}}
+            {{statements_for_added_or_updated_configs | join('\n')}}
+            END;
+        {% endset %}
+        {{ log("Query " ~ query, info=True) }}
+        {% do run_query(query) %}
+    {% else %} {{ log("No changes in masking configs", info=True) }}
+    {% endif %}
+
     {% do run_query(create_data_masking_config_table_query) %}
     {% do drop_temp_config_table(
         database_name=access_management_database_name,
@@ -57,6 +76,7 @@
           database_name,
           schema_name,
           alias,
+          materialization,
           col.column_name,
           col.users_with_access,
           col.groups_with_access
@@ -84,14 +104,134 @@
     {% set query_config_table_result = dbt.run_query(query_config_table) %}
 
     {% for row in query_config_table_result.rows %}
+        {% set users_str = row.users_with_access %}
+        {% set groups_str = row.groups_with_access %}
+        {% set users_list = users_str.strip("[]").replace("'", "").split(",") %}
+        {% set groups_list = groups_str.strip("[]").replace("'", "").split(",") %}
+
         {% do masking_configs.append({
-            'database_name': row.schema_name,
+            'database_name': row.database_name,
             'schema_name': row.schema_name,
             'alias': row.alias,
+            'materialization': row.materialization,
             'column_name': row.column_name,
-            'users_with_access': row.users_with_access,
-            'groups_with_access': row.groups_with_access
+            'users_with_access': users_list,
+            'groups_with_access': groups_list
         }) %}
     {% endfor %}
     {{ return(masking_configs) }}
+{% endmacro %}
+
+{% macro masking_key(d) %}
+    {{ d['database_name'] ~ '.' ~ d['schema_name'] ~ '.' ~ d['alias'] ~ '.' ~ d['materialization'] ~ '.' ~ d['column_name'] }}
+{% endmacro %}
+
+{% macro diff_masking_configs(new_masking_configs, previous_masking_configs) %}
+    {% set prev_map = {} %}
+    {% for d in previous_masking_configs %}
+        {% set _ = prev_map.update({ masking_key(d): d }) %}
+    {% endfor %}
+
+    {% set new_map = {} %}
+    {% for d in new_masking_configs %}
+        {% set _ = new_map.update({ masking_key(d): d }) %}
+    {% endfor %}
+
+    {% set deleted = [] %}
+    {% for k, d in prev_map.items() %}
+        {% if k not in new_map %} {% do deleted.append(d) %} {% endif %}
+    {% endfor %}
+
+    {% set added_or_updated = [] %}
+    {% for k, d in new_map.items() %}
+        {% if k not in prev_map or d != prev_map[k] %}
+            {% do added_or_updated.append(d) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ return({'deleted': deleted, 'added_or_updated': added_or_updated}) }}
+{% endmacro %}
+
+{% macro get_materialization_to_securable_object_type(materialization) %}
+    {% set materialization_to_securable_object_type_map = {
+        "seed": "table",
+        "view": "view",
+        "materialized_view": "materialized view",
+        "table": "table",
+        "streaming_table": "table",
+        "incremental": "table"
+    } %}
+
+    {{ return(materialization_to_securable_object_type_map.get(materialization | trim | lower)) }}
+{% endmacro %}
+
+{% macro generate_masking_function_name(config, access_management_database_name, access_management_schema_name) -%}
+    {{- access_management_database_name ~ '.' ~
+        access_management_schema_name ~ '.' ~
+        config['database_name'] ~ '_' ~
+        config['schema_name'] ~ '_' ~
+        config['alias'] ~ '_' ~
+        config['column_name'] -}}
+{%- endmacro %}
+
+{% macro get_statements_for_deleted_configs(deleted_configs, access_management_database_name, access_management_schema_name) %}
+    {% set statements = [] %}
+
+    {% for c in deleted_configs %}
+        {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+        {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
+        {%- set alter_stmt = (
+            'alter ' ~ object_type ~ ' ' ~ full_table_name ~
+            ' alter column ' ~ c['column_name'] ~ ' drop mask;'
+        ) -%}
+        {% set drop_function_statement = 'drop function if exists ' ~ generate_masking_function_name(c, access_management_database_name, access_management_schema_name) ~ ';' %}
+
+        {% do statements.append(alter_stmt) %}
+        {% do statements.append(drop_function_statement) %}
+    {% endfor %}
+
+    {{ return(statements) }}
+{% endmacro %}
+
+{% macro get_statements_for_added_or_updated_configs(added_or_updated_configs, access_management_database_name, access_management_schema_name) %}
+    {% set statements = [] %}
+
+    {% for c in added_or_updated_configs %}
+        {#- -- generate function name ---#}
+        {%- set function_name = generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
+
+        {#- -- generate access conditions ---#}
+        {%- set user_conditions = [] -%}
+        {%- for user in c['users_with_access'] -%}
+            {%- do user_conditions.append("session_user() = '" ~ user ~ "'") -%}
+        {%- endfor -%}
+
+        {%- set group_conditions = [] -%}
+        {%- for group in c['groups_with_access'] -%}
+            {%- do group_conditions.append("is_account_group_member('" ~ group ~ "')") -%}
+        {%- endfor -%}
+
+        {%- set access_conditions = (group_conditions + user_conditions) | join(' OR ') -%}
+
+        {#- -- generate CREATE OR REPLACE FUNCTION statement ---#}
+        {%- set create_function_stmt = (
+            'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' STRING) RETURN CASE WHEN ' ~
+            access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE \'***\' END;'
+        ) -%}
+
+        {#- -- generate ALTER statement based on materialization ---#}
+        {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+        {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
+        {%- set alter_table_stmt = (
+            'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
+            ' ALTER COLUMN ' ~ c['column_name'] ~
+            ' SET MASK ' ~ function_name ~ ';'
+        ) -%}
+
+        {#- -- append statements ---#}
+        {% do statements.append(create_function_stmt) %}
+        {% do statements.append(alter_table_stmt) %}
+    {% endfor %}
+
+    {{ return(statements) }}
 {% endmacro %}

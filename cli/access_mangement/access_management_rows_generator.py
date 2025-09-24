@@ -218,6 +218,7 @@ def _get_materialization_to_securable_object_type_databricks(
     materialization: str,
 ) -> str:
     materialization_to_securable_object_type_map = {
+        "seed": "TABLE",
         "view": "VIEW",
         "materialized_view": "MATERIALIZED VIEW",
         "table": "TABLE",

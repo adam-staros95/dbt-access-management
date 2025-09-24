@@ -35,7 +35,7 @@ def _parse_columns_config(columns_config: List[Dict]) -> List[ColumnMaskingConfi
 
 
 def parse_data_masking_config(data: Dict[str, Any]) -> DataMaskingConfig:
-    tables_config = data["configuration"]
+    tables_config = data.get("configuration") or []
     data_masking_config = []
     for table_config in tables_config:
         for table_name, columns in table_config.items():
