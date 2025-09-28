@@ -34,11 +34,22 @@
     ) %}
 
     {% set diff = diff_masking_configs(new_masking_configs=new_masking_configs, previous_masking_configs=previous_masking_configs) %}
-    {% set deleted = diff['deleted'] %}
-    {% set added_or_updated = diff['added_or_updated'] %}
 
-    {% set statements_for_deleted_configs = get_statements_for_deleted_configs(diff['deleted'], access_management_database_name, access_management_schema_name) %}
-    {% set statements_for_added_or_updated_configs = get_statements_for_added_or_updated_configs(diff['added_or_updated'], access_management_database_name, access_management_schema_name) %}
+    {% set columns_info_for_previous_masking_configs = get_columns_info_for_masking_configs(masking_configs=previous_masking_configs) %}
+    {% set columns_info_for_new_masking_configs = get_columns_info_for_masking_configs(masking_configs=new_masking_configs) %}
+
+    {% set statements_for_deleted_configs = get_statements_for_deleted_configs(
+        deleted_configs=diff['deleted'],
+        columns_info=columns_info_for_previous_masking_configs,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name
+    ) %}
+    {% set statements_for_added_or_updated_configs = get_statements_for_added_or_updated_configs(
+        added_or_updated_configs=diff['added_or_updated'],
+        columns_info=columns_info_for_new_masking_configs,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name
+    ) %}
 
     {% if (statements_for_deleted_configs | length) > 0 or (statements_for_added_or_updated_configs | length) > 0 %}
         {% set query %}
@@ -174,63 +185,79 @@
         config['column_name'] -}}
 {%- endmacro %}
 
-{% macro get_statements_for_deleted_configs(deleted_configs, access_management_database_name, access_management_schema_name) %}
+{% macro get_masking_for_column_type(column_type) %}
+    {% set t = column_type | lower %}
+    {% if t in ['decimal', 'short', 'byte', 'int', 'long', 'double', 'float'] %}
+        {{ return('NULL') }}
+    {% elif t == 'boolean' %} {{ return('FALSE') }}
+    {% elif t in ['date', 'timestamp'] %} {{ return('NULL') }}
+    {% elif t in ['string', 'binary', 'array'] %}
+        {{ return("CAST('*****' AS " ~ t ~ ")") }}
+    {% else %} {{ return('NULL') }}
+    {% endif %}
+{% endmacro %}
+
+{% macro get_statements_for_deleted_configs(deleted_configs, columns_info, access_management_database_name, access_management_schema_name) %}
     {% set statements = [] %}
 
     {% for c in deleted_configs %}
-        {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
-        {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
-        {%- set alter_stmt = (
-            'alter ' ~ object_type ~ ' ' ~ full_table_name ~
-            ' alter column ' ~ c['column_name'] ~ ' drop mask;'
-        ) -%}
-        {% set drop_function_statement = 'drop function if exists ' ~ generate_masking_function_name(c, access_management_database_name, access_management_schema_name) ~ ';' %}
+        {% set column_key = c.database_name ~ '.' ~ c.schema_name ~ '.' ~ c.alias ~ '.' ~ c.column_name %}
+        {% if column_key in columns_info %}
+            {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+            {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
+            {%- set alter_stmt = (
+                'alter ' ~ object_type ~ ' ' ~ full_table_name ~
+                ' alter column ' ~ c['column_name'] ~ ' drop mask;'
+            ) -%}
+            {% set drop_function_statement = 'drop function if exists ' ~ generate_masking_function_name(c, access_management_database_name, access_management_schema_name) ~ ';' %}
 
-        {% do statements.append(alter_stmt) %}
-        {% do statements.append(drop_function_statement) %}
+            {% do statements.append(alter_stmt) %}
+            {% do statements.append(drop_function_statement) %}
+        {% endif %}
     {% endfor %}
 
     {{ return(statements) }}
 {% endmacro %}
 
-{% macro get_statements_for_added_or_updated_configs(added_or_updated_configs, access_management_database_name, access_management_schema_name) %}
+
+{% macro get_statements_for_added_or_updated_configs(added_or_updated_configs, columns_info, access_management_database_name, access_management_schema_name) %}
     {% set statements = [] %}
 
     {% for c in added_or_updated_configs %}
-        {#- -- generate function name ---#}
-        {%- set function_name = generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
+        {% set column_key = c.database_name ~ '.' ~ c.schema_name ~ '.' ~ c.alias ~ '.' ~ c.column_name %}
+        {% if column_key in columns_info %}
+            {% set column_type = columns_info[column_key] %}
 
-        {#- -- generate access conditions ---#}
-        {%- set user_conditions = [] -%}
-        {%- for user in c['users_with_access'] -%}
-            {%- do user_conditions.append("session_user() = '" ~ user ~ "'") -%}
-        {%- endfor -%}
+            {%- set function_name = generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
 
-        {%- set group_conditions = [] -%}
-        {%- for group in c['groups_with_access'] -%}
-            {%- do group_conditions.append("is_account_group_member('" ~ group ~ "')") -%}
-        {%- endfor -%}
+            {%- set user_conditions = [] -%}
+            {%- for user in c['users_with_access'] -%}
+                {%- do user_conditions.append("session_user() = '" ~ user ~ "'") -%}
+            {%- endfor -%}
 
-        {%- set access_conditions = (group_conditions + user_conditions) | join(' OR ') -%}
+            {%- set group_conditions = [] -%}
+            {%- for group in c['groups_with_access'] -%}
+                {%- do group_conditions.append("is_account_group_member('" ~ group ~ "')") -%}
+            {%- endfor -%}
 
-        {#- -- generate CREATE OR REPLACE FUNCTION statement ---#}
-        {%- set create_function_stmt = (
-            'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' STRING) RETURN CASE WHEN ' ~
-            access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE \'***\' END;'
-        ) -%}
+            {%- set access_conditions = (group_conditions + user_conditions) | join(' OR ') -%}
 
-        {#- -- generate ALTER statement based on materialization ---#}
-        {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
-        {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
-        {%- set alter_table_stmt = (
-            'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
-            ' ALTER COLUMN ' ~ c['column_name'] ~
-            ' SET MASK ' ~ function_name ~ ';'
-        ) -%}
+            {%- set create_function_stmt = (
+                'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' ' ~ column_type ~ ') RETURN CASE WHEN ' ~
+                access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE ' ~ get_masking_for_column_type(column_type) ~ ' END;'
+            ) -%}
 
-        {#- -- append statements ---#}
-        {% do statements.append(create_function_stmt) %}
-        {% do statements.append(alter_table_stmt) %}
+            {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+            {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
+            {%- set alter_table_stmt = (
+                'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
+                ' ALTER COLUMN ' ~ c['column_name'] ~
+                ' SET MASK ' ~ function_name ~ ';'
+            ) -%}
+
+            {% do statements.append(create_function_stmt) %}
+            {% do statements.append(alter_table_stmt) %}
+        {% endif %}
     {% endfor %}
 
     {{ return(statements) }}
