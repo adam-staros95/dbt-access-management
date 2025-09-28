@@ -1,4 +1,4 @@
-{% macro redshift__mask_data() %}
+{% macro redshift__mask_data(access_management_database_name, access_management_schema_name) %}
     {% if execute %}
 
         {% if config.get('materialized') == 'snapshot' %}

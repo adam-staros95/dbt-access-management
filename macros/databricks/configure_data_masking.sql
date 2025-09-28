@@ -53,10 +53,10 @@
 
     {% if (statements_for_deleted_configs | length) > 0 or (statements_for_added_or_updated_configs | length) > 0 %}
         {% set query %}
-            BEGIN
+            begin
             {{statements_for_deleted_configs | join('\n')}}
             {{statements_for_added_or_updated_configs | join('\n')}}
-            END;
+            end;
         {% endset %}
         {{ log("Query " ~ query, info=True) }}
         {% do run_query(query) %}

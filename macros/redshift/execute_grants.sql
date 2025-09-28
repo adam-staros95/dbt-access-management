@@ -1,4 +1,4 @@
-{% macro redshift__execute_grants(am_database_name, am_schema_name) %}
+{% macro redshift__execute_grants(access_management_database_name, access_management_schema_name) %}
     {% if execute %}
         {% if config.get('materialized') != 'ephemeral' %}
             {% set database_identities = dbt_access_management.get_database_identities() %}

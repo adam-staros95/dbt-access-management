@@ -51,12 +51,12 @@
     -- TODO: Wrap revokes with try catch
     {% if (revokes_to_execute | length) > 0 or (grants_to_execute | length) > 0 %}
         {% set execute_revokes_and_grants_query %}
-        BEGIN
+        begin
         -- Revokes
         {{revokes_to_execute | join('\n')}}
         -- Grants
         {{grants_to_execute | join('\n')}}
-        END;
+        end;
         {% endset %}
         {{ log("Running revokes and grants:\n" ~ execute_revokes_and_grants_query, info=True) }}
         {% do run_query(execute_revokes_and_grants_query) %}
