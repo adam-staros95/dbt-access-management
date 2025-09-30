@@ -27,7 +27,6 @@
             {% endfor %}
 
             {% set unique_grants = all_grants_for_a_model | unique | list %}
-            {{ log('Uniqe grants:\n' ~ unique_grants, info=true) }}
 
             {% if unique_grants %}
                 {% set all_grants_query %}
