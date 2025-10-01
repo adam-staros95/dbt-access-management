@@ -171,13 +171,13 @@
     {% for c in deleted_configs %}
         {% set column_key = c.database_name ~ '.' ~ c.schema_name ~ '.' ~ c.alias ~ '.' ~ c.column_name %}
         {% if column_key in columns_info %}
-            {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+            {%- set object_type = dbt_access_management.get_materialization_to_securable_object_type(c['materialization']) -%}
             {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
             {%- set alter_stmt = (
                 'alter ' ~ object_type ~ ' ' ~ full_table_name ~
                 ' alter column ' ~ c['column_name'] ~ ' drop mask;'
             ) -%}
-            {% set drop_function_statement = 'drop function if exists ' ~ generate_masking_function_name(c, access_management_database_name, access_management_schema_name) ~ ';' %}
+            {% set drop_function_statement = 'drop function if exists ' ~ dbt_access_management.generate_masking_function_name(c, access_management_database_name, access_management_schema_name) ~ ';' %}
 
             {% do statements.append(alter_stmt) %}
             {% do statements.append(drop_function_statement) %}
@@ -196,7 +196,7 @@
         {% if column_key in columns_info %}
             {% set column_type = columns_info[column_key] %}
 
-            {%- set function_name = generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
+            {%- set function_name = dbt_access_management.generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
 
             {%- set user_conditions = [] -%}
             {%- for user in c['users_with_access'] -%}
@@ -212,10 +212,10 @@
 
             {%- set create_function_stmt = (
                 'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' ' ~ column_type ~ ') RETURN CASE WHEN ' ~
-                access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE ' ~ get_masking_for_column_type(column_type) ~ ' END;'
+                access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE ' ~ dbt_access_management.get_masking_for_column_type(column_type) ~ ' END;'
             ) -%}
 
-            {%- set object_type = get_materialization_to_securable_object_type(c['materialization']) -%}
+            {%- set object_type = dbt_access_management.get_materialization_to_securable_object_type(c['materialization']) -%}
             {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
             {%- set alter_table_stmt = (
                 'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
