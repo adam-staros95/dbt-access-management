@@ -10,13 +10,17 @@ from dbt.contracts.graph.manifest import Manifest
 from cli.access_mangement.configure_access_management_macro_properties_provider import (
     get_configure_access_management_macro_properties,
 )
-from cli.constants import SUPPORTED_SQL_ENGINES, SQLEngine, DEFAULT_SCHEMA_NAME
+from cli.constants import (
+    SUPPORTED_SQL_ENGINES,
+    DEFAULT_SCHEMA_NAME,
+    DEFAULT_ACCESS_MANAGEMENT_CONFIG_FILE_PATH,
+    DEFAULT_DATA_MASKING_CONFIG_FILE_PATH,
+)
 from cli.data_masking.configure_data_masking_macro_properties_provider import (
     get_configure_data_masking_macro_properties,
 )
 from cli.exceptions import (
     SQLEngineNotSupportedException,
-    OverridingSchemaNameNotSupportedException,
 )
 from cli.model import ManifestNode, ModelType, ConfigureMacroProperties
 
@@ -247,21 +251,14 @@ def cli():
     default=True,
 )
 @click.option(
-    "--database-name",
-    help="Database name for storing access management configuration. "
-    "WARNING: Library not work correctly in Redshift when models are "
-    "configured across multiple databases within a single dbt project. "
-    "Due to that make sure that on Redshift this parameter always has same "
-    "name as database on which you are executing access management configuration! "
-    "Multi database support will be added in next releases.",
+    "--access-management-database-name",
+    help="Database name for storing access management configuration",
     type=str,
     required=True,
 )
 @click.option(
-    "--schema-name",
-    help="Schema name for storing access management configuration,`access_management` by default. "
-    "WARNING: Overriding schema-name won't work in Redshift in current version of library. "
-    "Possibility for overriding schema name in Redshift will be added in next releases",
+    "--access-management-schema-name",
+    help="Schema name for storing access management configuration,`access_management` by default.",
     type=str,
     required=True,
     default=DEFAULT_SCHEMA_NAME,
@@ -270,20 +267,20 @@ def cli():
     "--access-management-config-file-path",
     help="Path to the access management config file.",
     type=str,
-    default="access_management.yml",
+    default=DEFAULT_ACCESS_MANAGEMENT_CONFIG_FILE_PATH,
 )
 @click.option(
     "--data-masking-config-file-path",
     help="Path to the data masking config file.",
     type=str,
-    default="data_masking.yml",
+    default=DEFAULT_DATA_MASKING_CONFIG_FILE_PATH,
 )
 def configure(
     dbt_command: str,
     configure_access_management: bool,
     configure_data_masking: bool,
-    database_name: str,
-    schema_name: str,
+    access_management_database_name: str,
+    access_management_schema_name: str,
     access_management_config_file_path: str,
     data_masking_config_file_path: str,
 ):
@@ -299,9 +296,6 @@ def configure(
     if sql_engine.lower() not in SUPPORTED_SQL_ENGINES:
         raise SQLEngineNotSupportedException()
 
-    if sql_engine == SQLEngine.REDSHIFT and schema_name != DEFAULT_SCHEMA_NAME:
-        raise OverridingSchemaNameNotSupportedException()
-
     manifest_nodes = _get_manifest_nodes_eligible_for_configuration(
         manifest, project_name
     )
@@ -313,8 +307,8 @@ def configure(
                 config_file_path=access_management_config_file_path,
                 sql_engine=sql_engine,
                 project_name=project_name,
-                database_name=database_name,
-                schema_name=schema_name,
+                database_name=access_management_database_name,
+                schema_name=access_management_schema_name,
             )
         )
         if configure_access_management
@@ -328,8 +322,8 @@ def configure(
                 config_file_path=data_masking_config_file_path,
                 sql_engine=sql_engine,
                 project_name=project_name,
-                database_name=database_name,
-                schema_name=schema_name,
+                database_name=access_management_database_name,
+                schema_name=access_management_schema_name,
             )
         )
         if configure_data_masking

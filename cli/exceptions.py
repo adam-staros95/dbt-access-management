@@ -1,22 +1,4 @@
-from typing import Set
-
 from cli.constants import SUPPORTED_SQL_ENGINES
-
-
-class MultipleDatabaseNamesException(Exception):
-    def __init__(self, db_names: Set[str]):
-        message = (
-            f"Multiple database names found: {', '.join(db_names)} in your DBT project.\n"
-            f"Most probably you use multi project setup with cross database queries.\n"
-            f"Please provide `--database-name` parameter to the command!\n"
-        )
-        super().__init__(message)
-
-
-class DatabaseAccessManagementConfigNotExistsException(Exception):
-    def __init__(self, db_name: str):
-        message = f"Access management config for database: {db_name} not specified!"
-        super().__init__(message)
 
 
 class SQLEngineNotSupportedException(Exception):
@@ -41,12 +23,6 @@ class DataMaskingConfigFileNotFoundException(Exception):
         super().__init__(message)
 
 
-class OverridingSchemaNameNotSupportedException(Exception):
-    def __init__(self):
-        message = "Overriding schema name is not supported in Redshift!. Support will be added in next releases."
-        super().__init__(message)
-
-
 class NotSupportedMaterializationException(Exception):
     def __init__(
         self, provided_materialization: str, supported_materializations: list[str]
@@ -54,5 +30,15 @@ class NotSupportedMaterializationException(Exception):
         message = (
             f"Materialization: {provided_materialization} is not supported!\n"
             f"Supported materializations are: {', '.join(supported_materializations)}.\n"
+        )
+        super().__init__(message)
+
+
+class DatabricksColumnMaskingNotSupportedOnViewException(Exception):
+    def __init__(self, model_name: str):
+        message = (
+            f"Databricks does not support column masking on views, "
+            f"but masking configured for following model materialized as view: {model_name}.\n"
+            f"Remove masking config from view!"
         )
         super().__init__(message)

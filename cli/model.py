@@ -9,7 +9,6 @@ class ModelType(str, Enum):
     SNAPSHOT = "snapshot"
 
 
-# TODO: Add `materialization` enum
 class ManifestNode(BaseModel):
     database_name: str
     model_type: ModelType

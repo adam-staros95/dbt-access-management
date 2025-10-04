@@ -25,3 +25,5 @@ reports/sources/*.csv
 .DS_Store
 .ruff_cache
 /profiles.yml
+/target/
+/_tmp/

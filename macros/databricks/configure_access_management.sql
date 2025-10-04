@@ -12,8 +12,7 @@
     {% do validate_configured_identities(
         database_name=access_management_database_name,
         schema_name=access_management_schema_name,
-        config_table_name=temp_access_management_config_table_name,
-        should_stop_execution=True
+        config_table_name=temp_access_management_config_table_name
     ) %}
 
     {% set databases_used_in_project = get_all_databases_used_in_project(
@@ -26,8 +25,8 @@
     {% set objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
 
     {% set new_unique_grants_and_revokes = get_unique_grants_and_revokes(
-        database_name=access_management_database_name,
-        schema_name=access_management_schema_name,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name,
         config_table_name=temp_access_management_config_table_name,
         objects_in_databases=objects_in_databases,
         should_check_table_exists=False
@@ -36,8 +35,8 @@
     {% set new_unique_revokes = new_unique_grants_and_revokes['unique_revokes'] %}
 
     {% set previous_unique_grants_and_revokes = get_unique_grants_and_revokes(
-        database_name=access_management_database_name,
-        schema_name=access_management_schema_name,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name,
         config_table_name=config_access_management_table_name,
         objects_in_databases=objects_in_databases,
         should_check_table_exists=True
@@ -66,13 +65,13 @@
     {% do drop_temp_config_table(database_name=access_management_database_name, schema_name=access_management_schema_name, temp_config_table_name=temp_access_management_config_table_name) %}
 {% endmacro %}
 
-{% macro get_unique_grants_and_revokes(database_name, schema_name, config_table_name, objects_in_databases, should_check_table_exists=True) %}
-    {%- set relation = database_name ~ '.' ~ schema_name ~ '.' ~ config_table_name -%}
+{% macro get_unique_grants_and_revokes(access_management_database_name, access_management_schema_name, config_table_name, objects_in_databases, should_check_table_exists=True) %}
+    {%- set relation = access_management_database_name ~ '.' ~ access_management_schema_name ~ '.' ~ config_table_name -%}
     {% set unique_grants = [] %}
     {% set unique_revokes = [] %}
 
     {% if should_check_table_exists %}
-        {% if not check_table_exists(database_name, schema_name, config_table_name) %}
+        {% if not check_table_exists(access_management_database_name, access_management_schema_name, config_table_name) %}
             {{ log("Table " ~ relation ~ " does not exist yet.", info=True) }}
             {{ return({
                 'unique_grants': unique_grants,

@@ -1,8 +1,8 @@
-{% macro validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution=True) %}
-    {{ adapter.dispatch('validate_configured_identities')(database_name, schema_name, config_table_name, should_stop_execution) }}
+{% macro validate_configured_identities(database_name, schema_name, config_table_name) %}
+    {{ adapter.dispatch('validate_configured_identities')(database_name, schema_name, config_table_name) }}
 {% endmacro %}
 
-{% macro redshift__validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution) %}
+{% macro redshift__validate_configured_identities(database_name, schema_name, config_table_name) %}
     {% if execute %}
         {% set database_identities = get_database_identities() %}
         {% set config_table_identities = get_config_table_identities(database_name, schema_name, config_table_name) %}
@@ -18,10 +18,7 @@
 
         {% if issues | length > 0 %}
             {% set issue_message = "The following identities configured in DBT access management, but do not exist in database:" ~ issues | join(', ') %}
-            {% if should_stop_execution %}
-                {{ exceptions.raise_compiler_error(issue_message) }}
-            {% else %} {{ log(issue_message, info=True) }}
-            {% endif %}
+            {{ exceptions.raise_compiler_error(issue_message) }}
         {% else %}
             {{ log("No issues found, all identities configured in DBT access management, exist in database", info=True) }}
         {% endif %}
@@ -36,7 +33,7 @@
     {{ return(identity_strings) }}
 {% endmacro %}
 
-{% macro databricks__validate_configured_identities(database_name, schema_name, config_table_name, should_stop_execution) %}
+{% macro databricks__validate_configured_identities(database_name, schema_name, config_table_name) %}
     {% if execute %}
         {% set ts = run_started_at.strftime("%Y%m%d%H%M%S") %}
         {% set test_identity_check_table_name = 'test_identity_check_' ~ ts %}

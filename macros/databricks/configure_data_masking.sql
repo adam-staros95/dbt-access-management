@@ -18,16 +18,16 @@
     -- TODO: Check if information about materialization is required
     {% set objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
     {% set new_masking_configs = get_masking_configs(
-        database_name=access_management_database_name,
-        schema_name=access_management_schema_name,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name,
         config_table_name=temp_data_masking_config_table_name,
         objects_in_databases=objects_in_databases,
         should_check_table_exists=False
     ) %}
 
     {% set previous_masking_configs = get_masking_configs(
-        database_name=access_management_database_name,
-        schema_name=access_management_schema_name,
+        access_management_database_name=access_management_database_name,
+        access_management_schema_name=access_management_schema_name,
         config_table_name=config_data_masking_table_name,
         objects_in_databases=objects_in_databases,
         should_check_table_exists=True
@@ -71,14 +71,13 @@
     ) %}
 {% endmacro %}
 
--- TODO: rename `database_name` to `access_management_database_name` and `schema_name`
--- to `access_management_schema_name`
-{% macro get_masking_configs(database_name, schema_name, config_table_name, objects_in_databases, should_check_table_exists) %}
-    {%- set relation = database_name ~ '.' ~ schema_name ~ '.' ~ config_table_name -%}
+
+{% macro get_masking_configs(access_management_database_name, access_management_schema_name, config_table_name, objects_in_databases, should_check_table_exists) %}
+    {%- set relation = access_management_database_name ~ '.' ~ access_management_schema_name ~ '.' ~ config_table_name -%}
     {% set masking_configs = [] %}
 
     {% if should_check_table_exists %}
-        {% if not check_table_exists(database_name, schema_name, config_table_name) %}
+        {% if not check_table_exists(access_management_database_name, access_management_schema_name, config_table_name) %}
             {{ log("Table " ~ relation ~ " does not exist yet.", info=True) }}
             {{ return(masking_configs) }}
         {% endif %}

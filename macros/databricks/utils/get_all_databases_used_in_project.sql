@@ -12,7 +12,7 @@
         should_check_table_exists=False
     ) %}
 
-    {% set combined = (databases_configured_in_config_table + databases_configured_in_temp_config_table) | unique %}
+    {% set combined = (databases_configured_in_config_table + databases_configured_in_temp_config_table) | unique | list %}
     {{ return(combined) }}
 {% endmacro %}
 

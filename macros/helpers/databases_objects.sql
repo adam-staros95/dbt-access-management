@@ -29,23 +29,26 @@
 
 {% macro databricks__get_objects_in_databases(databases) %}
     {% set objects_in_database = [] %}
-    {% set queries = [] %}
-    {% for database in databases %}
-        {% set q %}
-            select
-                table_catalog || '.' || table_schema || '.' || table_name as full_table_name
-            from {{ database }}.information_schema.tables
-        {% endset %}
-        {% do queries.append(q) %}
-    {% endfor %}
 
-    {% set union_query = queries | join(' union all ') %}
-    {% set objects_in_database_rows = run_query(union_query) %}
-
-    {% if objects_in_database_rows %}
-        {% for row in objects_in_database_rows %}
-            {% do objects_in_database.append(row.full_table_name) %}
+    {% if databases and databases | length > 0 %}
+        {% set queries = [] %}
+        {% for database in databases %}
+            {% set q %}
+                select
+                    table_catalog || '.' || table_schema || '.' || table_name as full_table_name
+                from {{ database }}.information_schema.tables
+            {% endset %}
+            {% do queries.append(q) %}
         {% endfor %}
+
+        {% set union_query = queries | join(' union all ') %}
+        {% set objects_in_database_rows = run_query(union_query) %}
+
+        {% if objects_in_database_rows %}
+            {% for row in objects_in_database_rows %}
+                {% do objects_in_database.append(row.full_table_name) %}
+            {% endfor %}
+        {% endif %}
     {% endif %}
 
     {{ return(objects_in_database) }}

@@ -10,3 +10,5 @@ class SQLEngine(str, Enum):
 SUPPORTED_SQL_ENGINES: List[SQLEngine] = [SQLEngine.REDSHIFT, SQLEngine.DATABRICKS]
 
 DEFAULT_SCHEMA_NAME = "access_management"
+DEFAULT_ACCESS_MANAGEMENT_CONFIG_FILE_PATH = "access_management.yml"
+DEFAULT_DATA_MASKING_CONFIG_FILE_PATH = "data_masking.yml"

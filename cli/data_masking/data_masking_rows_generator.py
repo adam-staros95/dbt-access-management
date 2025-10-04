@@ -6,6 +6,7 @@ from cli.constants import SQLEngine
 from cli.data_masking.data_masking_config_parser import (
     DataMaskingConfig,
 )
+from cli.exceptions import DatabricksColumnMaskingNotSupportedOnViewException
 from cli.model import ManifestNode
 
 
@@ -43,8 +44,15 @@ def generate_data_masking_rows(
 
                     masking_config.append(base_config)
                 break
-
-        access_management_row = DataMaskingRow(
+        if (
+            masking_config
+            and sql_engine == SQLEngine.DATABRICKS
+            and node.materialization.lower() == "view"
+        ):
+            raise DatabricksColumnMaskingNotSupportedOnViewException(
+                model_name=node.model_name
+            )
+        data_masking_row = DataMaskingRow(
             project_name=project_name,
             database_name=node.database_name,
             schema_name=node.schema_name,
@@ -53,5 +61,5 @@ def generate_data_masking_rows(
             materialization=node.materialization,
             masking_config=masking_config,
         )
-        data_masking_rows.append(access_management_row)
+        data_masking_rows.append(data_masking_row)
     return data_masking_rows
