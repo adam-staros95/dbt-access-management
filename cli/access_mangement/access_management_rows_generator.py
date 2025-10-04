@@ -224,6 +224,7 @@ def _get_materialization_to_securable_object_type_databricks(
         "table": "TABLE",
         "streaming_table": "TABLE",
         "incremental": "TABLE",
+        "snapshot": "TABLE",
     }
     securable_object_type = materialization_to_securable_object_type_map.get(
         materialization.lower(), None

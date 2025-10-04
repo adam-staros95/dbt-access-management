@@ -5,7 +5,8 @@
         "materialized_view": "materialized view",
         "table": "table",
         "streaming_table": "table",
-        "incremental": "table"
+        "incremental": "table",
+        "snapshot": "table"
     } %}
 
     {{ return(materialization_to_securable_object_type_map.get(materialization | trim | lower)) }}
