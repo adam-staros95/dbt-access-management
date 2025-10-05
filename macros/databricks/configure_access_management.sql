@@ -21,8 +21,12 @@
         config_table_name=config_access_management_table_name,
         temp_config_table_name=temp_access_management_config_table_name
     ) %}
-    -- TODO: Check if information about materialization is required
-    {% set objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
+    {% set all_objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
+
+    {% set objects_in_databases = [] %}
+    {% for o in all_objects_in_databases %}
+        {% do objects_in_databases.append(o.full_table_name) %}
+    {% endfor %}
 
     {% set new_unique_grants_and_revokes = get_unique_grants_and_revokes(
         access_management_database_name=access_management_database_name,

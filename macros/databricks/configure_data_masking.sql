@@ -15,8 +15,16 @@
         config_table_name=config_data_masking_table_name,
         temp_config_table_name=temp_data_masking_config_table_name
     ) %}
-    -- TODO: Check if information about materialization is required
-    {% set objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
+    {% set all_objects_in_databases = get_objects_in_databases(databases=databases_used_in_project) %}
+
+    {% set objects_in_databases = [] %}
+    {% for o in all_objects_in_databases %}
+        {% if o.table_type != 'view' %}
+            {% do objects_in_databases.append(o.full_table_name) %}
+        {% endif %}
+    {% endfor %}
+
+    {{ log(objects_in_databases, info=True) }}
     {% set new_masking_configs = get_masking_configs(
         access_management_database_name=access_management_database_name,
         access_management_schema_name=access_management_schema_name,
@@ -60,7 +68,7 @@
         {% endset %}
         {{ log("Query " ~ query, info=True) }}
         {% do run_query(query) %}
-    {% else %} {{ log("No changes in masking configs", info=True) }}
+    {% else %} {{ log("No changes in masking configs to execute.", info=True) }}
     {% endif %}
 
     {% do run_query(create_data_masking_config_table_query) %}
@@ -188,6 +196,7 @@
 
 
 {% macro get_statements_for_added_or_updated_configs(added_or_updated_configs, columns_info, access_management_database_name, access_management_schema_name) %}
+    {% set not_supported_masking_types = ['array', 'map', 'struct', 'interval'] %}
     {% set statements = [] %}
 
     {% for c in added_or_updated_configs %}
@@ -195,35 +204,40 @@
         {% if column_key in columns_info %}
             {% set column_type = columns_info[column_key] %}
 
-            {%- set function_name = dbt_access_management.generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
+            {% if column_type | lower not in not_supported_masking_types %}
 
-            {%- set user_conditions = [] -%}
-            {%- for user in c['users_with_access'] -%}
-                {%- do user_conditions.append("session_user() = '" ~ user ~ "'") -%}
-            {%- endfor -%}
+                {%- set function_name = dbt_access_management.generate_masking_function_name(c, access_management_database_name, access_management_schema_name) -%}
 
-            {%- set group_conditions = [] -%}
-            {%- for group in c['groups_with_access'] -%}
-                {%- do group_conditions.append("is_account_group_member('" ~ group ~ "')") -%}
-            {%- endfor -%}
+                {%- set user_conditions = [] -%}
+                {%- for user in c['users_with_access'] -%}
+                    {%- do user_conditions.append("session_user() = '" ~ user ~ "'") -%}
+                {%- endfor -%}
 
-            {%- set access_conditions = (group_conditions + user_conditions) | join(' OR ') -%}
+                {%- set group_conditions = [] -%}
+                {%- for group in c['groups_with_access'] -%}
+                    {%- do group_conditions.append("is_account_group_member('" ~ group ~ "')") -%}
+                {%- endfor -%}
 
-            {%- set create_function_stmt = (
-                'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' ' ~ column_type ~ ') RETURN CASE WHEN ' ~
-                access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE ' ~ dbt_access_management.get_masking_for_column_type(column_type) ~ ' END;'
-            ) -%}
+                {%- set access_conditions = (group_conditions + user_conditions) | join(' OR ') -%}
 
-            {%- set object_type = dbt_access_management.get_materialization_to_securable_object_type(c['materialization']) -%}
-            {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
-            {%- set alter_table_stmt = (
-                'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
-                ' ALTER COLUMN ' ~ c['column_name'] ~
-                ' SET MASK ' ~ function_name ~ ';'
-            ) -%}
+                {%- set create_function_stmt = (
+                    'CREATE OR REPLACE FUNCTION ' ~ function_name ~ '(' ~ c['column_name'] ~ ' ' ~ column_type ~ ') RETURN CASE WHEN ' ~
+                    access_conditions ~ ' THEN ' ~ c['column_name'] ~ ' ELSE ' ~ dbt_access_management.get_masking_for_column_type(column_type) ~ ' END;'
+                ) -%}
 
-            {% do statements.append(create_function_stmt) %}
-            {% do statements.append(alter_table_stmt) %}
+                {%- set object_type = dbt_access_management.get_materialization_to_securable_object_type(c['materialization']) -%}
+                {%- set full_table_name = c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] -%}
+                {%- set alter_table_stmt = (
+                    'ALTER ' ~ object_type ~ ' ' ~ full_table_name ~
+                    ' ALTER COLUMN ' ~ c['column_name'] ~
+                    ' SET MASK ' ~ function_name ~ ';'
+                ) -%}
+
+                {% do statements.append(create_function_stmt) %}
+                {% do statements.append(alter_table_stmt) %}
+            {% else %}
+                {{ log("Masking columns with type " ~ column_type ~ " is not supported. Configuring masking for column " ~ c['column_name'] ~ " in model " ~ c['database_name'] ~ '.' ~ c['schema_name'] ~ '.' ~ c['alias'] ~ " will be skipped", info=True) }}
+            {% endif %}
         {% endif %}
     {% endfor %}
 

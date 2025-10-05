@@ -35,7 +35,7 @@
         {% for database in databases %}
             {% set q %}
                 select
-                    table_catalog || '.' || table_schema || '.' || table_name as full_table_name
+                    table_catalog || '.' || table_schema || '.' || table_name as full_table_name, lower(table_type) as table_type
                 from {{ database }}.information_schema.tables
             {% endset %}
             {% do queries.append(q) %}
@@ -46,7 +46,7 @@
 
         {% if objects_in_database_rows %}
             {% for row in objects_in_database_rows %}
-                {% do objects_in_database.append(row.full_table_name) %}
+                {% do objects_in_database.append({'full_table_name': row.full_table_name, 'table_type': row.table_type}) %}
             {% endfor %}
         {% endif %}
     {% endif %}
