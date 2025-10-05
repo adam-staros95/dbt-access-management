@@ -24,7 +24,6 @@
         {% endif %}
     {% endfor %}
 
-    {{ log(objects_in_databases, info=True) }}
     {% set new_masking_configs = get_masking_configs(
         access_management_database_name=access_management_database_name,
         access_management_schema_name=access_management_schema_name,

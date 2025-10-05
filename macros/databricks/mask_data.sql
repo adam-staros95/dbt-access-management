@@ -1,6 +1,6 @@
 {% macro databricks__mask_data(access_management_database_name, access_management_schema_name) %}
     {% if execute %}
-        {% if config.get('materialized') != 'ephemeral' %}
+        {% if config.get('materialized') not in ['ephemeral', 'view'] %}
             {% set model_masking_configs = dbt_access_management.get_model_masking_configs(
                 access_management_database_name=access_management_database_name,
                 access_management_schema_name=access_management_schema_name,
